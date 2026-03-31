@@ -19,17 +19,21 @@
 2. `PAS`（五 trigger 探测，当前主线只用 BOF + PB）
 3. `IRS-minimal`（行业分桶约束，避免组合过度集中）
 
-## 3. PAS 五 Trigger 状态（冻结）
+## 3. PAS 五 Trigger 冻结地位（继承父系统全部结论）
 
-| Trigger | 状态 | 说明 |
-|---|---|---|
-| `BOF` | **主线启用** | 突破失败（Break of Failure），三年验证通过 |
-| `PB` | **主线启用** | 拉回入场（Pullback），三年验证通过 |
-| `BPB` | **主线拒绝** | 突破后拉回，三年验证未通过，代码保留但 system 层不启用 |
-| `TST` | 待独立验证 | 测试支撑/阻力，代码存在标记 PENDING |
-| `CPB` | 待独立验证 | 复合拉回，代码存在标记 PENDING |
+| Trigger | 地位 | 有效准入格 | 父系统结论卡 |
+|---|---|---|---|
+| `BOF` | **core / primary_trend_driver** | persisting 四格为主力（non-sparse 集中于 BULL/BEAR_PERSISTING × MAINSTREAM/COUNTERTREND） | 93 |
+| `PB` | **conditional / conditional_assist_driver** | `BULL_PERSISTING + with_flow`，`BEAR_PERSISTING + against_flow` | 110, 121 |
+| `TST` | **conditional / conditional_assist_driver** | `BULL_PERSISTING + with_flow`，`BEAR_PERSISTING + against_flow` | 126 ✅ |
+| `CPB` | **conditional / conditional_assist_driver** | `BULL_PERSISTING + with_flow`，`BEAR_PERSISTING + against_flow` | 129 ✅ |
+| `BPB` | **excluded / not_for_long_alpha** | — | 93, 131 |
 
-**BPB 禁止进入主线**，只作历史记录。TST / CPB 待独立三年窗口验证后才可启用。
+**说明：**
+- TST 和 CPB 均已完成父系统三年独立验证，不再是"待验证"。
+- 条件格准入：必须同时满足 `monthly_state ∈ {BULL_PERSISTING, BEAR_PERSISTING}` + 正确 `weekly_flow`，才允许进入主线。
+- BPB 永久禁止进入主线，无论测试结果如何。
+- 价格口径：信号层以 `backward-adjusted` 为准（研究层合同），尚未对齐 raw-execution 口径（父系统 130 号卡边界说明）。
 
 ## 4. 正式输入
 
@@ -82,12 +86,22 @@
 2. `BPB` 禁止在 `system` 层启用，无论测试结果如何。
 3. `PasSignal` 的 `signal_id` 必须全局唯一（格式：`PAS_{version}_{code}_{date}_{pattern}`）。
 4. `alpha` 不直接写 `trade_runtime`；研究结果只能经冻结桥接后才进入正式交易。
-5. `TST` / `CPB` 启用前必须有独立三年窗口验证证据。
+5. `TST` / `CPB` 已完成独立三年验证（父系统 126 / 129 号卡），仅限条件格准入，不得扩展到全 16 格。
 
 ## 9. 成功标准
 
-1. `BOF` 和 `PB` trigger 在三年历史窗口的信号质量测试通过
+1. `BOF` 和 `PB`/`TST`/`CPB` trigger 的准入格 cell gate 函数正确实现
 2. `PasSignal` 合同冻结，含 `pb_sequence_number` 字段
 3. `filter` 前置通过后的股票才触发 trigger 探测
 4. IRS 行业分桶约束能防止组合过度集中单一行业
 5. 研究结果可追溯到具体 run、窗口、参数和证据
+6. `ADMISSION_TABLE` 和 `cell_gate_check()` 均对齐父系统 93/110/126/129/131 冻结结论
+
+## 10. 本模块设计文档索引
+
+| 文档 | 内容 | 继承父系统来源 |
+|---|---|---|
+| `00-alpha-charter-20260331.md` | 模块章程（本文） | 父系统 `00 / 01` |
+| `01-pas-five-trigger-frozen-hierarchy-20260401.md` | 五 trigger 冻结层级与地位（全部结论汇总） | 父系统 93/110/121/126/129/131 |
+| `02-pas-cell-gate-and-16cell-admission-design-20260401.md` | 16 格准入表与 cell_gate_check 设计 | 父系统 110/126/129/131 |
+| `03-pas-contracts-and-output-governance-20260401.md` | PasSignal 合同冻结、pas_selected_trace 表名治理 | 父系统 `01-pas-selected-trace` |

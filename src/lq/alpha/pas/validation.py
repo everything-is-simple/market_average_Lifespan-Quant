@@ -22,39 +22,91 @@ SURFACE_LABELS = (
 # 五个触发模式
 TRIGGER_PATTERNS = ("BOF", "BPB", "PB", "TST", "CPB")
 
-# 当前治理裁决（True = 主线准入，False = 拒绝，None = 待验证）
+# 当前治理裁决（True = 主线准入，False = 拒绝，None = 尚无充分证据）
+# 注意：surface_label 只有 4 层。对于条件格 trigger（PB/TST/CPB），
+# 表面标签准入 + monthly_state 过滤共同构成完整准入判断。
+# 请使用 cell_gate_check() 进行精确 16 格判断。
+#
+# 父系统冻结来源：93（BOF）/ 110,121（PB）/ 126（TST）/ 129（CPB）/ 131（BPB）
 ADMISSION_TABLE: dict[str, dict[str, bool | None]] = {
     "BOF": {
+        # core trigger，持续态四格均为主力；FORMING/EXHAUSTING/REVERSING 格为辅助
         "BULL_MAINSTREAM": True,
-        "BULL_COUNTERTREND": None,
-        "BEAR_MAINSTREAM": None,
-        "BEAR_COUNTERTREND": None,
+        "BULL_COUNTERTREND": True,
+        "BEAR_MAINSTREAM": True,
+        "BEAR_COUNTERTREND": True,
     },
     "BPB": {
+        # 三年样本全面拒绝，永久禁止主线
         "BULL_MAINSTREAM": False,
         "BULL_COUNTERTREND": False,
         "BEAR_MAINSTREAM": False,
         "BEAR_COUNTERTREND": False,
     },
     "PB": {
+        # 条件格准入：BULL_PERSISTING+with_flow / BEAR_PERSISTING+against_flow
+        # surface_label 层面 True 为必要条件，还需结合 monthly_state 过滤（见 cell_gate_check）
         "BULL_MAINSTREAM": True,
-        "BULL_COUNTERTREND": None,
+        "BULL_COUNTERTREND": False,
         "BEAR_MAINSTREAM": False,
-        "BEAR_COUNTERTREND": False,
+        "BEAR_COUNTERTREND": True,
     },
     "TST": {
-        "BULL_MAINSTREAM": None,
-        "BULL_COUNTERTREND": None,
-        "BEAR_MAINSTREAM": None,
-        "BEAR_COUNTERTREND": None,
+        # 条件格准入，父系统 126 号卡冻结：BULL_PERSISTING+MAINSTREAM / BEAR_PERSISTING+COUNTERTREND
+        "BULL_MAINSTREAM": True,
+        "BULL_COUNTERTREND": False,
+        "BEAR_MAINSTREAM": False,
+        "BEAR_COUNTERTREND": True,
     },
     "CPB": {
-        "BULL_MAINSTREAM": None,
-        "BULL_COUNTERTREND": None,
-        "BEAR_MAINSTREAM": None,
-        "BEAR_COUNTERTREND": None,
+        # 条件格准入，父系统 129 号卡冻结：BULL_PERSISTING+MAINSTREAM / BEAR_PERSISTING+COUNTERTREND
+        "BULL_MAINSTREAM": True,
+        "BULL_COUNTERTREND": False,
+        "BEAR_MAINSTREAM": False,
+        "BEAR_COUNTERTREND": True,
     },
 }
+
+# ---------------------------------------------------------------------------
+# 精确 16 格准入表（monthly_state_8 × weekly_flow × pattern）
+# 每个元素 = (monthly_state, weekly_flow) -> 允许模式集
+# ---------------------------------------------------------------------------
+
+# 所有条件格 trigger（PB/TST/CPB）共享相同的小准入集
+_CONDITIONAL_ADMITTED_CELLS: frozenset[tuple[str, str]] = frozenset({
+    ("BULL_PERSISTING", "with_flow"),      # BULL_PERSISTING__MAINSTREAM
+    ("BEAR_PERSISTING", "against_flow"),   # BEAR_PERSISTING__COUNTERTREND
+})
+
+# BOF 在持续态四格都是主力，其他态也可触发但较稀疏
+CELL_GATE_TABLE: dict[str, frozenset[tuple[str, str]]] = {
+    "BOF": frozenset({
+        ("BULL_PERSISTING", "with_flow"),
+        ("BULL_PERSISTING", "against_flow"),
+        ("BEAR_PERSISTING", "with_flow"),
+        ("BEAR_PERSISTING", "against_flow"),
+    }),
+    "BPB": frozenset(),  # 全面拒绝
+    "PB":  _CONDITIONAL_ADMITTED_CELLS,
+    "TST": _CONDITIONAL_ADMITTED_CELLS,
+    "CPB": _CONDITIONAL_ADMITTED_CELLS,
+}
+
+
+def cell_gate_check(pattern: str, monthly_state: str, weekly_flow: str) -> bool:
+    """16 格精确准入判断（父系统冻结结论）。
+
+    参数：
+        pattern       — PasTriggerPattern 字符串屖
+        monthly_state — MonthlyState8 值（来自 MalfContext.monthly_state）
+        weekly_flow   — WeeklyFlowRelation 屖（来自 MalfContext.weekly_flow）
+
+    返回：True = 允许进入主线 trigger 探测
+    """
+    admitted_cells = CELL_GATE_TABLE.get(pattern)
+    if admitted_cells is None:
+        return False
+    return (monthly_state, weekly_flow) in admitted_cells
 
 
 @dataclass

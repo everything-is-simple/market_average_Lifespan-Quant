@@ -1,11 +1,11 @@
 """PAS 五触发探测器实现。
 
-治理状态（来自参考文档 2026-03-28）：
-    BOF  — 已验证，主线可用
-    BPB  — 已验证，拒绝主线（三年样本不通过）
-    PB   — 已验证，条件格准入
-    TST  — 代码已实现，待独立正式验证
-    CPB  — 代码已实现，定义仍需收敛，待验证
+治理状态（父系统冻结口径）：
+    BOF  — core/primary_trend_driver，persisting 四格主力，父系统卡 93
+    BPB  — excluded/not_for_long_alpha，永久禁止主线，父系统卡 131
+    PB   — conditional/conditional_assist_driver，条件格准入，父系统卡 110/121
+    TST  — conditional/conditional_assist_driver，条件格准入，父系统卡 126 ✅
+    CPB  — conditional/conditional_assist_driver，条件格准入，父系统卡 129 ✅
 """
 
 from __future__ import annotations
@@ -396,7 +396,7 @@ def detect_pb(
 
 # ---------------------------------------------------------------------------
 # TST 探测器 — 测试支撑
-# 状态：代码已实现，待独立正式验证
+# 状态：conditional/conditional_assist_driver，条件格准入（父系统卡 126 已冻结）
 # ---------------------------------------------------------------------------
 
 def detect_tst(
@@ -498,7 +498,7 @@ def detect_tst(
 
 # ---------------------------------------------------------------------------
 # CPB 探测器 — 压缩后突破
-# 状态：代码已实现，定义仍需收敛，待验证
+# 状态：conditional/conditional_assist_driver，条件格准入（父系统卡 129 已冻结）
 # ---------------------------------------------------------------------------
 
 def detect_cpb(
