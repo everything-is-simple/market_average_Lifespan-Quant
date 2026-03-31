@@ -1,17 +1,23 @@
-# MALF 三层矩阵主轴冻结合同 / 2026-03-31
+# MALF 矩阵主轴冻结合同（月线 × 周线 = 16 格）/ 2026-03-31
 
 > 继承来源：父系统 `13-malf-three-layer-matrix-modeling-charter-20260327.md` +
 > `14-malf-matrix-axis-contract-implementation-20260327.md`
 > 本文是当前系统最终定型口径，不允许在未另开执行卡的前提下修改主轴字段名或取值。
+>
+> **2026-04-01 修订说明**：PAS 五形态原则上不是 MALF 内容。
+> 原"执行轴（第三层）pas_trigger"已从本文移除。
+> 80 格地图（`monthly_state_8 × weekly_flow × pas_trigger`）属于 `alpha/pas` 模块研究层，不在 MALF 矩阵合同范围内。
 
-## 1. 三层主轴（冻结）
+## 1. MALF 矩阵主轴（冻结）
 
 ```
-monthly_state_8  ×  weekly_flow_relation_to_monthly  ×  pas_trigger
-      ↓                         ↓                           ↓
-   主状态轴                  关系轴                        执行轴
-（月线长期背景）          （周线顺逆关系）             （PAS 触发类型）
+monthly_state_8  ×  weekly_flow_relation_to_monthly
+      ↓                         ↓
+   主状态轴                  关系轴
+（月线长期背景）          （周线顺逆关系）
 ```
+
+MALF 矩阵 = 8 × 2 = **16 格**，这是 MALF 模块输出的全部矩阵内容。
 
 ### 1.1 主状态轴（第一层）
 
@@ -49,36 +55,21 @@ monthly_state_8  ×  weekly_flow_relation_to_monthly  ×  pas_trigger
 - `MAINSTREAM` → `with_flow`
 - `COUNTERTREND` → `against_flow`
 
-### 1.3 执行轴（第三层）
+## 2. MALF 主矩阵（16 格）
 
-字段名：`pas_trigger`
+16 格 = `monthly_state_8 × weekly_flow_relation_to_monthly`，这是 MALF 输出的完整矩阵。
 
-只回答：**具体发生的是哪一种 PAS 触发？**
-
-| 值 | 当前状态 |
-|---|---|
-| `BOF` | ✅ 主线，已验证 |
-| `PB` | ✅ 主线，已验证 |
-| `TST` | 🔲 待独立验证 |
-| `CPB` | 🔲 待独立验证 |
-| `BPB` | ❌ 已拒绝主线 |
-
-执行轴由 `alpha/pas` 模块输出，不由 `malf` 模块计算。
-
-## 2. 主矩阵
-
-```
-当前主矩阵 = monthly_state_8 × weekly_flow_relation_to_monthly
-= 8 × 2 = 16 格
-```
-
-16 格示例：
-- `BULL_PERSISTING + with_flow` — 长期牛市持续，周线当前也是顺势推进
-- `BULL_PERSISTING + against_flow` — 长期牛市持续，但周线当前是牛市里的逆势回调
+代表性格子示例：
+- `BULL_PERSISTING + with_flow` — 长期牛市持续，周线当前顺势推进
+- `BULL_PERSISTING + against_flow` — 长期牛市持续，周线当前是牛市内逆势回调
 - `BEAR_PERSISTING + with_flow` — 长期熊市持续，周线当前顺势下行
-- `BEAR_PERSISTING + against_flow` — 长期熊市持续，周线当前是熊市里的反弹
+- `BEAR_PERSISTING + against_flow` — 长期熊市持续，周线当前是熊市内逆势反弹
 
-加上执行轴后：`16 × 触发器数 = N 格总结论`（当前 BOF/PB 主线已验证 16 格）
+**关于 80 格地图的边界声明**：
+
+`alpha/pas` 模块在研究层使用 `monthly_state_8 × weekly_flow × pas_trigger` = 80 格地图，
+这是 `alpha/pas` 自己的研究矩阵，消费 MALF 的 16 格作为背景输入。
+**80 格地图属于 `alpha/pas`，不属于 MALF 矩阵合同。**
 
 ## 3. 派生字段（观察字段，不是主轴）
 
@@ -114,22 +105,31 @@ monthly_state_8  ×  weekly_flow_relation_to_monthly  ×  pas_trigger
 
 ## 5. 报表解释入口（冻结）
 
-正式解释顺序固定为：
+MALF 矩阵正式解释顺序：
 
-1. 先看 `monthly_state_8`
-2. 再看 `weekly_flow_relation_to_monthly`
-3. 最后看 `pas_trigger`
+1. 先看 `monthly_state_8`（月线长期背景在哪个阶段）
+2. 再看 `weekly_flow_relation_to_monthly`（周线当前顺流还是逆流）
 
-观察字段（`surface_label / wave_role / scene_id` 等）只能放在附加列或附录，不能替代上述三轴作为解释入口。
+观察字段（`surface_label / wave_role / scene_id` 等）只能放在附加列或附录，
+不能替代两轴作为解释入口。
 
-## 6. 与父系统 BOF 16 格验证的关系
+**注**：若需进一步看触发器，应查 `alpha/pas` 模块的 80 格地图输出，不在 MALF 报表层面。
 
-父系统已完成 BOF 在 16 格 (`monthly_state_8 × weekly_flow_relation`) 中的正式验证。  
-新系统继承此验证结论，无需重跑。  
-下一步 PB 的 16 格验证，当条件具备时另开执行卡推进。
+## 6. 与父系统验证结论的继承关系
+
+父系统已完成 BOF 和 PB 在 `monthly_state_8 × weekly_flow` 16 格中的正式验证，结论摘要：
+
+| 触发器 | 地位 | 有效格 |
+|---|---|---|
+| `BOF` | core / primary_trend_driver | persisting 四格为主力 |
+| `PB` | conditional / conditional_assist_driver | `BULL_PERSISTING__MAINSTREAM` 和 `BEAR_PERSISTING__COUNTERTREND` |
+| `BPB` | excluded / not_for_long_alpha | — |
+
+新系统继承此验证结论。上述内容由 `alpha/pas` 模块消费，MALF 仅提供 16 格背景输入。
 
 ## 7. 铁律
 
-1. 主轴字段名冻结，不允许单方面修改或新造轴名。
-2. 每个新 PAS 触发器进入主线前，必须先独立完成 `monthly_state_8 × weekly_flow` 16 格验证。
-3. 主矩阵解释不允许跳过 16 格验证直接发布"80 格总结论"。
+1. MALF 主轴字段名冻结（`monthly_state` + `weekly_flow`），不允许单方面新造轴名。
+2. `pas_trigger` 不是 MALF 矩阵轴，MALF 对外合同中不含 `pas_trigger` 字段。
+3. `alpha/pas` 消费 `MalfContext`（16 格背景），自行维护 80 格地图，不得反向要求 MALF 输出触发器。
+4. 观察字段不得冒充主轴。

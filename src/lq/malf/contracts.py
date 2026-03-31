@@ -145,6 +145,13 @@ class MalfContext:
     monthly_strength: float | None = None    # 月线强度 0~1
     weekly_strength: float | None = None     # 周线强度 0~1
 
+    # 第三层：日线节奏（新高日系列，立花义正思想）
+    # 需要 L2 日线数据；pipeline 集成前默认为空
+    is_new_high_today: bool = False          # 当日是否为新高日
+    new_high_seq: int = 0                    # window 内第几个新高日（0 = 非新高日）
+    days_since_last_new_high: int | None = None  # 距上一个新高日的交易日间距
+    new_high_count_in_window: int = 0        # window 内新高日总数量
+
     def __post_init__(self) -> None:
         # 运行期防御：确保枚举值合法
         if self.monthly_state not in MONTHLY_STATE_8_VALUES:
@@ -161,6 +168,10 @@ class MalfContext:
             "surface_label": self.surface_label,
             "monthly_strength": self.monthly_strength,
             "weekly_strength": self.weekly_strength,
+            "is_new_high_today": self.is_new_high_today,
+            "new_high_seq": self.new_high_seq,
+            "days_since_last_new_high": self.days_since_last_new_high,
+            "new_high_count_in_window": self.new_high_count_in_window,
         }
 
 
