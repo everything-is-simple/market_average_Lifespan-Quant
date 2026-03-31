@@ -1,0 +1,9 @@
+repos:
+  - repo: local
+    hooks:
+      - id: development-governance-check
+        name: development governance check
+        entry: python scripts/system/check_development_governance.py
+        language: system
+        pass_filenames: true
+        files: ^(docs/|scripts/|src/|tests/|README\.md|AGENTS\.md|\.gitignore|\.pre-commit-config\.yaml|pyproject\.toml)
