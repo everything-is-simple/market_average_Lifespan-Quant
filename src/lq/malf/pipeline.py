@@ -118,17 +118,23 @@ def run_malf_batch(
     with duckdb.connect(str(market_base_path), read_only=True) as base_conn:
         for code in codes:
             try:
-                # 读取月线数据
+                # 读取月线数据（来源：market_base.stock_monthly_adjusted，后复权）
                 monthly_df: pd.DataFrame = base_conn.execute(
-                    "SELECT month_start, open, high, low, close, volume "
-                    "FROM monthly_bar WHERE code = ? ORDER BY month_start",
+                    "SELECT month_start_date AS month_start, "
+                    "       open, high, low, close, volume "
+                    "FROM stock_monthly_adjusted "
+                    "WHERE code = ? AND adjust_method = 'backward' "
+                    "ORDER BY month_start_date",
                     [code],
                 ).df()
 
-                # 读取周线数据
+                # 读取周线数据（来源：market_base.stock_weekly_adjusted，后复权）
                 weekly_df: pd.DataFrame = base_conn.execute(
-                    "SELECT week_start, open, high, low, close, volume "
-                    "FROM weekly_bar WHERE code = ? ORDER BY week_start",
+                    "SELECT week_start_date AS week_start, "
+                    "       open, high, low, close, volume "
+                    "FROM stock_weekly_adjusted "
+                    "WHERE code = ? AND adjust_method = 'backward' "
+                    "ORDER BY week_start_date",
                     [code],
                 ).df()
 

@@ -39,7 +39,7 @@
 
 | DB | 路径 | 内容 |
 |----|------|------|
-| `raw_market` | `Lifespan-data/raw/` | baostock 原始日线 |
+| `raw_market` | `Lifespan-data/raw/` | mootdx 本地通达信 .day 文件（原始日线） + gbbq 除权除息事件 |
 | `market_base` | `Lifespan-data/base/` | 复权价、均线、量比 |
 | `research_lab` | `Lifespan-data/research/` | PAS 信号、选中 trace |
 | `malf` | `Lifespan-data/malf/` | MALF 三层主轴输出 |

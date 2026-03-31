@@ -92,3 +92,27 @@
 4. `surface_label` 四值正确派生
 5. 批量构建能在 `market_base.duckdb` 覆盖全市场股票后正常运行
 6. `MalfContext` 能被 `filter` 与 `alpha/pas` 消费并通过测试
+
+## 10. 本模块设计文档索引
+
+| 文档 | 内容 | 继承父系统来源 |
+|---|---|---|
+| `00-malf-charter-20260331.md` | 模块章程（本文） | 父系统 `00` |
+| `01-malf-full-cycle-layering-frozen-design-20260331.md` | 全周期分层：月线/周线/日线三层职责边界 | 父系统 `10 / 12` |
+| `02-malf-three-layer-matrix-frozen-contract-20260331.md` | 三层矩阵主轴冻结合同：字段名、取值、16 格框架 | 父系统 `13 / 14` |
+| `03-malf-monthly-state-8-frozen-definition-20260331.md` | 月线八态定义、判定阈值、五指数体系、已知 Gap | 父系统 `04 / 09 / 11` |
+| `04-malf-weekly-flow-relation-frozen-definition-20260331.md` | 周线顺逆定义、判定规则、兼容别名 | 父系统 `12 / 13` |
+| `05-malf-pipeline-and-contracts-frozen-design-20260331.md` | Pipeline 流程、数据库 Schema、MalfContext 合同 | 父系统 `14` |
+
+## 11. 代码出入修复记录（2026-03-31）
+
+本轮整理中发现并修复的代码出入点：
+
+| 文件 | 问题 | 修复 |
+|---|---|---|
+| `src/lq/malf/pipeline.py` | `monthly_bar` / `weekly_bar` 表名不存在 | 改为 `stock_monthly_adjusted` / `stock_weekly_adjusted` |
+| `src/lq/malf/pipeline.py` | `month_start` / `week_start` 列名与 bootstrap schema 不一致 | 使用 `month_start_date AS month_start` 等别名 |
+| `src/lq/malf/pipeline.py` | 无 `adjust_method` 过滤条件 | 补 `AND adjust_method = 'backward'` |
+
+以下已知 Gap 待后续执行卡处理（见文档 `03`）：
+- `monthly.py` 的 `classify_monthly_state()` 缺少 `BEAR_REVERSING` 显式返回路径

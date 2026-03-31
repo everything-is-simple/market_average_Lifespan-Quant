@@ -15,19 +15,33 @@
 
 它负责数据采集、清洗、存储和增量更新，向上游模块提供可信的市场数据基础库（`market_base`）。
 
-**设计原则：主线完全本地化，零网络依赖即可运行。** tushare 仅作审计。
+**设计原则：主线完全本地化，零网络依赖即可运行。** tushare（第一校准源）与 baostock（第二校准源）仅用于 cross-source 审计，均不参与 L2 主链构建。
 
-## 3. 数据来源（三层，冻结）
+## 3. 数据来源（四层，冻结）
 
 | 来源 | 类型 | 角色 |
 |---|---|---|
 | mootdx + `.day` 文件 | 本地离线 | **主线**，日线 OHLCV 原始数据 |
 | TDX gbbq 文件 | 本地离线 | **主线**，除权除息事件（分红/送股/配股） |
-| tushare HTTP API | 在线辅助 | **审计**，复权因子交叉校验，不参与 L2 构建 |
+| tushare HTTP API | 在线辅助 | **第一校准源**，复权因子 cross-check、基本面快照、交易日历 |
+| baostock API | 在线辅助 | **第二校准源 / fallback**，`adjust_factor` + `dividend_data` 双校验 |
 
 路径注入：
 - `TDX_ROOT` 环境变量 → 通达信本地目录（默认 `G:\new-tdx\new-tdx`）
 - `TUSHARE_TOKEN_PATH` 环境变量 → token 文件路径（可选，仅审计用）
+
+### 3.1 双源校准五类事件规则（继承父系统 139 号卡冻结，不可随意修改）
+
+| 类别 | 规则状态 | 说明 |
+|---|---|---|
+| category 1 | `provisional_dual_source_comparable_with_mild_drift_watch` | 主体双源可比，但 mild drift 会重复出现，保持观察 |
+| category 2 | `conditional_comparable_with_mild_drift_watch` | 条件可比，mild drift watch |
+| category 3 | `stable_baostock_boundary_use_tushare_fill` | 最稳定，baostock boundary + tushare 补填 |
+| category 5 | `boundary_fill_with_mild_drift_watch` | boundary fill 主导，mild drift watch |
+| category 9 | `holdout_pending_factor_path_resolution` | 悬置，factor path 问题未解决前不纳入正式链 |
+
+BaoStock 在本系统中永远是**第二校准源**，不是主源，不是第一校准源的替代。
+若要升级 BaoStock 的使用深度（如全量 batch audit、阈值冻结），必须另开独立执行卡，不允许在现有脚本中静默扩展。
 
 ## 4. 数据分层（冻结）
 
@@ -62,8 +76,9 @@
 1. L1 原始数据采集（mootdx + gbbq）
 2. L2 标准库构建（复权 + 聚合）
 3. 增量更新与断点续传
-4. tushare 审计探针（低频，可选）
-5. schema bootstrap（DuckDB 建表）
+4. tushare 审计探针（第一校准，低频，可选）
+5. baostock 审计探针（第二校准，低频，按五类事件规则使用）
+6. schema bootstrap（DuckDB 建表）
 
 ### 7.2 不负责
 
@@ -74,10 +89,12 @@
 ## 8. 铁律
 
 1. `raw_market` 层只做原始事实存储，不做任何调整或推断。
-2. `market_base` 层的复权因子只能从 L1 本地计算，禁止直接用 tushare 复权价。
+2. `market_base` 层的复权因子只能从 L1 本地计算，禁止直接用 tushare 或 baostock 复权价。
 3. tushare 只能写审计表，禁止写 `raw_market` 或 `market_base` 正式表。
-4. 所有路径通过 `core/paths.py` 注入，禁止硬编码路径或 token。
-5. 增量更新必须幂等，重复运行不产生重复记录。
+4. baostock 永远是第二校准源，禁止替代 tdx_local 主链，禁止未经审计反写正式五库。
+5. 若要升级 baostock 的使用深度（全量 batch audit / 阈值冻结），必须另开独立执行卡，不允许静默扩展。
+6. 所有路径通过 `core/paths.py` 注入，禁止硬编码路径或 token。
+7. 增量更新必须幂等，重复运行不产生重复记录。
 
 ## 9. 成功标准
 

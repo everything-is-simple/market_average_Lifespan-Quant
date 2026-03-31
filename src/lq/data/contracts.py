@@ -16,13 +16,22 @@ class DataSourceType(str, Enum):
       TDX_LOCAL_DAY  — mootdx 读取通达信本地 .day 文件（原始未复权价）
       TDX_LOCAL_GBBQ — 通达信本地 gbbq 文件（除权除息事件，复权因子来源）
 
-    辅助（在线，仅用于审计/补充）：
-      TUSHARE        — tushare HTTP API（adj_factor 审计 / daily_basic / trade_cal）
+    辅助（在线，仅用于校准/审计）：
+      TUSHARE        — tushare HTTP API（adj_factor 第一校准 / daily_basic / trade_cal）
+      BAOSTOCK       — baostock API（adj_factor 第二校准，fallback，禁止替代主链）
+
+    双源校准规则（继承父系统 139 号卡冻结口径）：
+      category 1 — provisional_dual_source_comparable_with_mild_drift_watch
+      category 2 — conditional_comparable_with_mild_drift_watch
+      category 3 — stable_baostock_boundary_use_tushare_fill
+      category 5 — boundary_fill_with_mild_drift_watch
+      category 9 — holdout_pending_factor_path_resolution
     """
 
     TDX_LOCAL_DAY = "tdx_local_day"       # 主线：日线原始价
     TDX_LOCAL_GBBQ = "tdx_local_gbbq"     # 主线：除权除息（复权依据）
-    TUSHARE = "tushare"                    # 辅助：复权因子审计 + 基本面数据
+    TUSHARE = "tushare"                    # 第一校准：复权因子审计 + 基本面数据
+    BAOSTOCK = "baostock"                  # 第二校准：adjust_factor + dividend_data（fallback）
 
 
 def _utc_suffix() -> str:
