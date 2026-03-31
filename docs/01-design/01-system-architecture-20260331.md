@@ -25,8 +25,45 @@ data → malf → structure(filter) → alpha/pas → position → trade → sys
 ## 3. 模块边界
 
 ### 3.1 data
-- 职责：baostock 原始数据采集、复权价计算、均线/量比计算、落盘
-- 输入：baostock API
+
+数据层由三个独立来源协同，**主线完全本地化（无网络依赖）**，tushare 仅用于复权因子审计。
+
+#### 来源 A — mootdx（主线，离线）
+
+- 读取通达信本地 `.day` 文件（`vipdoc/{sh,sz,bj}/lday/`）
+- 产出 `raw_stock_daily`、`raw_index_daily`（原始未复权价、成交量）
+- 回退策略：mootdx 失败时直接解析 `.day` 二进制
+
+#### 来源 B — TDX 本地 gbbq（主线，离线）
+
+- 解密 `T0002/hq_cache/gbbq` 文件，解析 14 种企业行动事件（分红、送股、配股等）
+- 产出 `raw_xdxr_event`，作为本地复权因子计算的唯一输入
+- 路径：`TDX_ROOT` 环境变量注入（默认 `G:\new-tdx\new-tdx`）
+
+#### 来源 C — tushare（辅助，在线）
+
+- `adj_factor` API：与本地复权因子做交叉审计
+- `daily_basic` API：换手率、PE/PB 等基本面因子（本地 gbbq 无法覆盖）
+- `trade_cal` API：交易日历
+- token 通过本地配置文件 `docs/04-reference/tushare/` 读取，禁止硬编码
+- 不参与主线 L2 构建，仅用于数据质量审计
+
+#### L2 构建（完全本地）
+
+- 复权因子 = 由 `raw_stock_daily` + `raw_xdxr_event` 本地计算（后复权，backward adjusted）
+- 周线/月线 = 由后复权日线聚合（不使用外部周/月线接口）
+- 均线/量比 = SQL 窗口函数计算
+
+| 层级 | 数据集 | 来源 |
+| ---- | ------ | ---- |
+| L1 | `raw_stock_daily` / `raw_index_daily` | mootdx（本地）|
+| L1 | `raw_xdxr_event` | TDX gbbq（本地）|
+| L1 | `raw_asset_snapshot` | tushare `stock_basic`（在线，低频）|
+| L2 | `stock_daily_adjusted` | L1 本地计算 |
+| L2 | `stock_weekly_adjusted` / `stock_monthly_adjusted` | L2 聚合 |
+| L2 | `index_daily` / `index_weekly` / `index_monthly` | L1 聚合 |
+
+- 输入：`TDX_ROOT`（本地通达信目录）+ `TUSHARE_TOKEN_PATH`（审计用，可选）
 - 输出：`raw_market.duckdb`（L1）、`market_base.duckdb`（L2）
 
 ### 3.2 malf

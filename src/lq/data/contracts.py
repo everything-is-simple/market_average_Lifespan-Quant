@@ -4,8 +4,25 @@ from __future__ import annotations
 
 from dataclasses import asdict, dataclass, field
 from datetime import date, datetime
+from enum import Enum
 from typing import Any
 from uuid import uuid4
+
+
+class DataSourceType(str, Enum):
+    """数据来源类型枚举。
+
+    主线（离线）：
+      TDX_LOCAL_DAY  — mootdx 读取通达信本地 .day 文件（原始未复权价）
+      TDX_LOCAL_GBBQ — 通达信本地 gbbq 文件（除权除息事件，复权因子来源）
+
+    辅助（在线，仅用于审计/补充）：
+      TUSHARE        — tushare HTTP API（adj_factor 审计 / daily_basic / trade_cal）
+    """
+
+    TDX_LOCAL_DAY = "tdx_local_day"       # 主线：日线原始价
+    TDX_LOCAL_GBBQ = "tdx_local_gbbq"     # 主线：除权除息（复权依据）
+    TUSHARE = "tushare"                    # 辅助：复权因子审计 + 基本面数据
 
 
 def _utc_suffix() -> str:
