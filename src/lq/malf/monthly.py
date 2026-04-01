@@ -99,8 +99,12 @@ def classify_monthly_state(
             if speed_slowing:
                 return "BULL_EXHAUSTING"
             return "BULL_PERSISTING"
-        else:
+        elif rebound_from_low >= MONTHLY_LONG_BULL_REVERSAL_PCT:
+            # 方向向上 + 反弹幅度达标，但总振幅还不够 → 牛市初期成型阶段
             return "BULL_FORMING"
+        else:
+            # 方向向上但反弹幅度不足 → 熊市末期开始反弹，BEAR_REVERSING
+            return "BEAR_REVERSING"
     else:
         # 下降趋势方向
         if drawdown_from_high <= -MONTHLY_LONG_BEAR_REVERSAL_PCT:

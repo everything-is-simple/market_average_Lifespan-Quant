@@ -117,4 +117,4 @@
 | `src/lq/malf/pipeline.py` | 无 `adjust_method` 过滤条件 | 补 `AND adjust_method = 'backward'` |
 
 以下已知 Gap 待后续执行卡处理（见文档 `03`）：
-- `monthly.py` 的 `classify_monthly_state()` 缺少 `BEAR_REVERSING` 显式返回路径
+- ~~`monthly.py` 的 `classify_monthly_state()` 缺少 `BEAR_REVERSING` 显式返回路径~~ ✅ 已在 2026-04-01 修复：在上升趋势分支补充了 `BEAR_REVERSING` 的显式返回路径（`rebound_from_low < MONTHLY_LONG_BULL_REVERSAL_PCT` 时返回 `BEAR_REVERSING`）

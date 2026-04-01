@@ -215,6 +215,41 @@ MARKET_BASE_SCHEMA_STATEMENTS = [
         PRIMARY KEY (market_code, trade_date)
     )
     """,
+    # 标准化资产主表（来自 raw_asset_snapshot 去重/标准化，全系统统一资产基础表）
+    """
+    CREATE TABLE IF NOT EXISTS asset_master (
+        code           VARCHAR NOT NULL,          -- 标准化代码，如 "000001.SZ"
+        asset_name     VARCHAR,                   -- 股票名称
+        exchange       VARCHAR,                   -- SH / SZ / BJ
+        asset_type     VARCHAR,                   -- stock / index
+        status         VARCHAR,                   -- L=上市 D=退市 P=暂停
+        listing_date   DATE,
+        delisting_date DATE,
+        refreshed_at   DATE NOT NULL,             -- 本次刷新日期
+        build_run_id   VARCHAR NOT NULL,
+        PRIMARY KEY (code)
+    )
+    """,
+    # 板块/行业分类主表（来自 TDX tdxhy.cfg / tdxzs.cfg）
+    """
+    CREATE TABLE IF NOT EXISTS block_master (
+        block_code   VARCHAR NOT NULL,            -- 板块/行业代码
+        block_name   VARCHAR,                     -- 板块/行业名称
+        block_type   VARCHAR,                     -- industry / concept / area 等
+        build_run_id VARCHAR NOT NULL,
+        PRIMARY KEY (block_code)
+    )
+    """,
+    # 股票-板块从属关系快照（来自 TDX block 文件，记录每次刷新时的成员关系）
+    """
+    CREATE TABLE IF NOT EXISTS block_membership_snapshot (
+        block_code    VARCHAR NOT NULL,
+        code          VARCHAR NOT NULL,           -- 股票代码
+        snapshot_date DATE    NOT NULL,
+        build_run_id  VARCHAR NOT NULL,
+        PRIMARY KEY (block_code, code, snapshot_date)
+    )
+    """,
     # L2 构建 manifest 记录
     """
     CREATE TABLE IF NOT EXISTS base_build_manifest (

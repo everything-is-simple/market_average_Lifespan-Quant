@@ -16,6 +16,7 @@ _REPO_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(_REPO_ROOT / "src"))
 
 from lq.core.paths import default_settings
+from lq.alpha.pas.bootstrap import bootstrap_research_lab
 from lq.data.bootstrap import bootstrap_data_storage
 from lq.malf.pipeline import bootstrap_malf_storage
 
@@ -54,6 +55,10 @@ def main(dry_run: bool = False) -> None:
     # 初始化 malf 数据库
     bootstrap_malf_storage(dbs.malf)
     print("✓ malf 数据库 schema 初始化完成")
+
+    # 初始化 research_lab 数据库（alpha/pas 正式信号表）
+    bootstrap_research_lab(dbs.research_lab)
+    print("✓ research_lab 数据库 schema 初始化完成")
 
     print()
     print("存储初始化完成。下一步：运行 fetch_daily.py 拉取行情数据。")
