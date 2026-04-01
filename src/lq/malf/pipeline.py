@@ -177,3 +177,104 @@ def run_malf_batch(
             )
 
     return manifest
+
+
+def run_malf_batch_incremental(
+    codes: Sequence[str],
+    signal_dates: Sequence[date],
+    market_base_path: Path,
+    malf_db_path: Path,
+    skip_existing: bool = True,
+) -> MALFBuildManifest:
+    """增量构建 MALF 上下文快照：只处理尚未计算的 (code, signal_date) 组合。
+
+    参数：
+        codes            — 股票代码列表
+        signal_dates     — 需要计算的日期序列（支持多日批量）
+        market_base_path — market_base 数据库路径（只读）
+        malf_db_path     — malf 数据库路径（读写）
+        skip_existing    — True 时跳过已有快照（幂等），False 时强制覆盖
+
+    返回：
+        MALFBuildManifest 构建摘要（以最后一个 signal_date 为 asof_date）
+    """
+    bootstrap_malf_storage(malf_db_path)
+
+    # 加载已有快照集合（code, date）
+    existing: set[tuple[str, date]] = set()
+    if skip_existing:
+        with duckdb.connect(str(malf_db_path), read_only=True) as malf_conn:
+            rows = malf_conn.execute(
+                "SELECT code, signal_date FROM malf_context_snapshot "
+                "WHERE signal_date = ANY(?)",
+                [list(signal_dates)],
+            ).fetchall()
+            existing = {(r[0], r[1]) for r in rows}
+
+    rows_out: list[dict] = []
+    error_count = 0
+
+    with duckdb.connect(str(market_base_path), read_only=True) as base_conn:
+        for signal_date in signal_dates:
+            for code in codes:
+                if skip_existing and (code, signal_date) in existing:
+                    continue   # 已有快照，跳过
+
+                try:
+                    monthly_df: pd.DataFrame = base_conn.execute(
+                        "SELECT month_start_date AS month_start, "
+                        "       open, high, low, close, volume "
+                        "FROM stock_monthly_adjusted "
+                        "WHERE code = ? AND adjust_method = 'backward' "
+                        "ORDER BY month_start_date",
+                        [code],
+                    ).df()
+
+                    weekly_df: pd.DataFrame = base_conn.execute(
+                        "SELECT week_start_date AS week_start, "
+                        "       open, high, low, close, volume "
+                        "FROM stock_weekly_adjusted "
+                        "WHERE code = ? AND adjust_method = 'backward' "
+                        "ORDER BY week_start_date",
+                        [code],
+                    ).df()
+
+                    ctx = build_malf_context_for_stock(code, signal_date, monthly_df, weekly_df)
+                    rows_out.append({**ctx.as_dict(), "run_id": None})
+                except Exception:
+                    error_count += 1
+                    continue
+
+    last_date = signal_dates[-1] if signal_dates else date.today()
+    manifest = MALFBuildManifest(
+        status="SUCCESS" if error_count == 0 else "PARTIAL",
+        asof_date=last_date,
+        stock_count=len(rows_out),
+    )
+
+    if rows_out:
+        with duckdb.connect(str(malf_db_path)) as malf_conn:
+            df_out = pd.DataFrame(rows_out)
+            df_out["run_id"] = manifest.run_id
+            # 增量写入：不清空全表，只 DELETE 本批次涉及的 (code, date) 后重插
+            malf_conn.execute(
+                "DELETE FROM malf_context_snapshot "
+                "WHERE signal_date = ANY(?) AND code = ANY(?)",
+                [list(signal_dates), list(codes)],
+            )
+            malf_conn.execute(
+                "INSERT INTO malf_context_snapshot SELECT * FROM df_out"
+            )
+            malf_conn.execute(
+                "INSERT OR REPLACE INTO malf_build_manifest "
+                "VALUES (?, ?, ?, ?, ?, current_timestamp)",
+                [
+                    manifest.run_id,
+                    manifest.status,
+                    manifest.asof_date,
+                    manifest.index_count,
+                    manifest.stock_count,
+                ],
+            )
+
+    return manifest

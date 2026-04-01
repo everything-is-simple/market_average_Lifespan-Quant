@@ -94,3 +94,126 @@ def from_baostock_code(code: str) -> str:
     normalized = to_baostock_code(code)
     market, symbol = normalized.split(".", maxsplit=1)
     return f"{symbol}.{market.upper()}"
+
+
+# ---------------------------------------------------------------------------
+# BaoStockProvider：审计接口骨架（依赖 baostock 可选库）
+# ---------------------------------------------------------------------------
+
+try:
+    import baostock as _bs
+    _HAS_BAOSTOCK = True
+except ImportError:
+    _bs = None  # type: ignore[assignment]
+    _HAS_BAOSTOCK = False
+
+
+class BaoStockProvider:
+    """BaoStock 第二校准源 provider（审计专用）。
+
+    只用于：adj_factor / dividend_data 与本地结果的交叉校验。
+    禁止替代主链，禁止未经审计直接反写正式五库。
+
+    安装依赖：pip install baostock
+    """
+
+    def __init__(self) -> None:
+        if not _HAS_BAOSTOCK:
+            raise ImportError(
+                "baostock 未安装，无法使用审计功能。请先 pip install baostock。"
+            )
+        self._logged_in = False
+
+    def _ensure_login(self) -> None:
+        """确保 baostock 已登录（幂等）。"""
+        if not self._logged_in:
+            _bs.login()
+            self._logged_in = True
+
+    def logout(self) -> None:
+        """退出 baostock 登录。"""
+        if self._logged_in:
+            _bs.logout()
+            self._logged_in = False
+
+    def get_adjust_factor(
+        self,
+        code: str,
+        start_date: str,
+        end_date: str,
+    ):
+        """获取单只股票的 BaoStock 复权因子序列。
+
+        参数：
+            code       — 本地格式代码（如 "000001.SZ"）
+            start_date — "YYYY-MM-DD"
+            end_date   — "YYYY-MM-DD"
+
+        返回：
+            pandas DataFrame，列含 ['trade_date', 'adj_factor']；
+            失败时返回 None。
+        """
+        import pandas as pd
+
+        self._ensure_login()
+        bs_code = to_baostock_code(code)
+        try:
+            rs = _bs.query_adjust_factor(
+                code=bs_code,
+                start_date=start_date,
+                end_date=end_date,
+            )
+            rows = []
+            while rs.error_code == "0" and rs.next():
+                row = rs.get_row_data()
+                rows.append({"trade_date": row[1], "adj_factor": float(row[2])})
+            if not rows:
+                return None
+            df = pd.DataFrame(rows)
+            df["trade_date"] = pd.to_datetime(df["trade_date"]).dt.date
+            return df
+        except Exception:
+            return None
+
+    def get_dividend_data(
+        self,
+        code: str,
+        year: str,
+        year_type: str = "operate",
+    ):
+        """获取单只股票的 BaoStock 分红数据（用于 dividend diff 审计）。
+
+        参数：
+            code      — 本地格式代码
+            year      — 年份字符串，如 "2023"
+            year_type — "operate"（经营年度）或 "report"（报告年度）
+
+        返回：
+            pandas DataFrame 或 None。
+        """
+        import pandas as pd
+
+        self._ensure_login()
+        bs_code = to_baostock_code(code)
+        try:
+            rs = _bs.query_dividend_data(
+                code=bs_code,
+                year=year,
+                yearType=year_type,
+            )
+            rows = []
+            while rs.error_code == "0" and rs.next():
+                rows.append(rs.get_row_data())
+            if not rows:
+                return None
+            fields = rs.fields
+            return pd.DataFrame(rows, columns=fields)
+        except Exception:
+            return None
+
+    def __enter__(self):
+        self._ensure_login()
+        return self
+
+    def __exit__(self, *args) -> None:
+        self.logout()
