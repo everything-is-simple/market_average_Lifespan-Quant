@@ -18,6 +18,9 @@ from datetime import date, timedelta
 # 已知 A 股法定节假日（非完整，仅覆盖主要节假日）
 # 格式：{year: [(month, day), ...]}
 # ---------------------------------------------------------------------------
+# 已知节假日的最大覆盖年份；超过此年份时 is_trading_day / next_trading_day 会抛 ValueError
+_MAX_SUPPORTED_YEAR: int = max(2024, 2025, 2026, 2027)  # = 2027
+
 _KNOWN_HOLIDAYS: dict[int, list[tuple[int, int]]] = {
     2024: [
         (1, 1),   # 元旦
@@ -56,7 +59,15 @@ _KNOWN_HOLIDAYS: dict[int, list[tuple[int, int]]] = {
 
 
 def _is_holiday(d: date) -> bool:
-    """判断是否为法定节假日（基于内置列表）。"""
+    """判断是否为法定节假日（基于内置列表）。
+
+    若年份超出 _MAX_SUPPORTED_YEAR，抛 ValueError fail fast，
+    避免静默把未覆盖年份的节假日全部当交易日处理。
+    """
+    if d.year > _MAX_SUPPORTED_YEAR:
+        raise ValueError(
+            f"交易日历未覆盖 {d.year} 年，请先扩展 _KNOWN_HOLIDAYS 并更新 _MAX_SUPPORTED_YEAR"
+        )
     year_holidays = _KNOWN_HOLIDAYS.get(d.year, [])
     return (d.month, d.day) in year_holidays
 

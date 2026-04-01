@@ -46,7 +46,9 @@ def classify_monthly_state(
     """根据月线 K 线数据判定 monthly_state_8。
 
     参数：
-        monthly_bars  — 包含 [month_start, close, high, low, volume] 的月线 DataFrame
+        monthly_bars  — 包含 [month_start, close, high, low, volume] 的月线 DataFrame；
+                        若含 trade_date 列（月最后交易日），则用 trade_date <= asof_date
+                        截断（正确语义）；否则回退到 month_start <= asof_date（向后兼容）
         asof_date     — 判断截止日（含当月）
         lookback_months — 回看月数
 
@@ -56,8 +58,9 @@ def classify_monthly_state(
     if monthly_bars.empty:
         return "BEAR_FORMING"   # 无数据时默认保守状态
 
-    # 过滤到截止日期前的数据并按时间排序
-    df = monthly_bars[monthly_bars["month_start"] <= asof_date].copy()
+    # 用 trade_date（月末日）截断可避免月中扫描纳入未来收盘；无该列时向后兼容
+    _cutoff_col = "trade_date" if "trade_date" in monthly_bars.columns else "month_start"
+    df = monthly_bars[monthly_bars[_cutoff_col] <= asof_date].copy()
     df = df.sort_values("month_start").tail(lookback_months).reset_index(drop=True)
 
     if len(df) < MONTHLY_LONG_MIN_BAR_COUNT:
@@ -126,7 +129,8 @@ def compute_monthly_strength(
     if monthly_bars.empty:
         return 0.5
 
-    df = monthly_bars[monthly_bars["month_start"] <= asof_date].copy()
+    _cutoff_col = "trade_date" if "trade_date" in monthly_bars.columns else "month_start"
+    df = monthly_bars[monthly_bars[_cutoff_col] <= asof_date].copy()
     df = df.sort_values("month_start").tail(lookback_months + 1).reset_index(drop=True)
 
     if len(df) < 2:

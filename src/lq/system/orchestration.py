@@ -185,12 +185,20 @@ def run_daily_signal_scan(
                     [code, signal_date],
                 ).df()
                 monthly_df: pd.DataFrame = conn.execute(
-                    "SELECT * FROM monthly_bar WHERE code = ? ORDER BY month_start",
+                    "SELECT month_start_date AS month_start, trade_date, "
+                    "       open, high, low, close, volume "
+                    "FROM stock_monthly_adjusted "
+                    "WHERE code = ? AND adjust_method = 'backward' "
+                    "ORDER BY month_start_date",
                     [code],
                 ).df()
 
                 weekly_df: pd.DataFrame = conn.execute(
-                    "SELECT * FROM weekly_bar WHERE code = ? ORDER BY week_start",
+                    "SELECT week_start_date AS week_start, trade_date, "
+                    "       open, high, low, close, volume "
+                    "FROM stock_weekly_adjusted "
+                    "WHERE code = ? AND adjust_method = 'backward' "
+                    "ORDER BY week_start_date",
                     [code],
                 ).df()
 

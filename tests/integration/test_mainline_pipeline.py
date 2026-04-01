@@ -46,15 +46,27 @@ SIGNAL_DATE = date(2024, 6, 3)   # 周一，T+1 应为周二 2024-06-04
 # Fixture 构造工具
 # ---------------------------------------------------------------------------
 
+def _last_day_of_month(year: int, month: int) -> date:
+    """返回指定年月的最后一天（代替月末交易日的简化计算）。"""
+    if month == 12:
+        return date(year + 1, 1, 1) - timedelta(days=1)
+    return date(year, month + 1, 1) - timedelta(days=1)
+
+
 def _make_monthly_bars(asof_date: date) -> pd.DataFrame:
-    """24 根月线，等比增长 4%/月，使 monthly_state → BULL_PERSISTING。"""
+    """24 根月线，等比增长 4%/月，使 monthly_state → BULL_PERSISTING。
+
+    trade_date = 该月最后一天（代替月末交易日），用于 P2-01 截断语义验证。
+    """
     rows = []
     close = 5000.0
     for i in range(24):
         month = date(2022, 1, 1) + timedelta(days=32 * i)
         month_start = date(month.year, month.month, 1)
+        trade_date = _last_day_of_month(month_start.year, month_start.month)
         rows.append({
             "month_start": month_start,
+            "trade_date": trade_date,
             "close": round(close, 2),
             "high": round(close * 1.05, 2),
             "low": round(close * 0.95, 2),
@@ -62,25 +74,30 @@ def _make_monthly_bars(asof_date: date) -> pd.DataFrame:
         })
         close *= 1.04
     df = pd.DataFrame(rows)
-    return df[df["month_start"] <= asof_date].copy()
+    return df[df["trade_date"] <= asof_date].copy()
 
 
 def _make_weekly_bars(asof_date: date) -> pd.DataFrame:
-    """20 根周线，线性上升 → weekly_flow = with_flow。"""
+    """20 根周线，线性上升 → weekly_flow = with_flow。
+
+    trade_date = week_start + 4 天（周五，代替周末交易日），用于 P2-01 截断语义验证。
+    """
     rows = []
     close = 8.0
     base = date(2024, 1, 1)
     for i in range(20):
         week_start = base + timedelta(weeks=i)
+        trade_date = week_start + timedelta(days=4)   # 周五（周最后交易日）
         rows.append({
             "week_start": week_start,
+            "trade_date": trade_date,
             "close": round(close, 2),
             "high": round(close + 0.5, 2),
             "low": round(close - 0.3, 2),
         })
         close += 0.2
     df = pd.DataFrame(rows)
-    return df[df["week_start"] <= asof_date].copy()
+    return df[df["trade_date"] <= asof_date].copy()
 
 
 def _make_daily_bars(signal_date: date) -> pd.DataFrame:

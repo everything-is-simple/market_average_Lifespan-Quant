@@ -120,7 +120,7 @@ def run_malf_batch(
             try:
                 # 读取月线数据（来源：market_base.stock_monthly_adjusted，后复权）
                 monthly_df: pd.DataFrame = base_conn.execute(
-                    "SELECT month_start_date AS month_start, "
+                    "SELECT month_start_date AS month_start, trade_date, "
                     "       open, high, low, close, volume "
                     "FROM stock_monthly_adjusted "
                     "WHERE code = ? AND adjust_method = 'backward' "
@@ -130,7 +130,7 @@ def run_malf_batch(
 
                 # 读取周线数据（来源：market_base.stock_weekly_adjusted，后复权）
                 weekly_df: pd.DataFrame = base_conn.execute(
-                    "SELECT week_start_date AS week_start, "
+                    "SELECT week_start_date AS week_start, trade_date, "
                     "       open, high, low, close, volume "
                     "FROM stock_weekly_adjusted "
                     "WHERE code = ? AND adjust_method = 'backward' "
@@ -222,7 +222,7 @@ def run_malf_batch_incremental(
 
                 try:
                     monthly_df: pd.DataFrame = base_conn.execute(
-                        "SELECT month_start_date AS month_start, "
+                        "SELECT month_start_date AS month_start, trade_date, "
                         "       open, high, low, close, volume "
                         "FROM stock_monthly_adjusted "
                         "WHERE code = ? AND adjust_method = 'backward' "
@@ -231,7 +231,7 @@ def run_malf_batch_incremental(
                     ).df()
 
                     weekly_df: pd.DataFrame = base_conn.execute(
-                        "SELECT week_start_date AS week_start, "
+                        "SELECT week_start_date AS week_start, trade_date, "
                         "       open, high, low, close, volume "
                         "FROM stock_weekly_adjusted "
                         "WHERE code = ? AND adjust_method = 'backward' "

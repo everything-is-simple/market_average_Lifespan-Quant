@@ -27,7 +27,9 @@ def classify_weekly_flow(
     """根据周线数据与月线状态判定周线顺逆关系。
 
     参数：
-        weekly_bars   — 包含 [week_start, close, high, low] 的周线 DataFrame
+        weekly_bars   — 包含 [week_start, close, high, low] 的周线 DataFrame；
+                        若含 trade_date 列（周最后交易日），则用 trade_date <= asof_date
+                        截断（正确语义）；否则回退到 week_start <= asof_date（向后兼容）
         monthly_state — 当前月线八态字符串
         asof_date     — 判断截止日（含当周）
         lookback_weeks — 回看周数
@@ -39,7 +41,9 @@ def classify_weekly_flow(
         # 无数据时根据月线状态给默认值
         return "with_flow" if monthly_state.startswith("BULL") else "against_flow"
 
-    df = weekly_bars[weekly_bars["week_start"] <= asof_date].copy()
+    # 用 trade_date（周末日）截断可避免周中扫描纳入未来收盘；无该列时向后兼容
+    _cutoff_col = "trade_date" if "trade_date" in weekly_bars.columns else "week_start"
+    df = weekly_bars[weekly_bars[_cutoff_col] <= asof_date].copy()
     df = df.sort_values("week_start").tail(lookback_weeks).reset_index(drop=True)
 
     if len(df) < 2:
@@ -75,7 +79,9 @@ def compute_weekly_strength(
     if weekly_bars.empty:
         return 0.5
 
-    df = weekly_bars[weekly_bars["week_start"] <= asof_date].copy()
+    # 用 trade_date（周末日）截断可避免周中扫描纳入未来收盘；无该列时向后兼容
+    _cutoff_col = "trade_date" if "trade_date" in weekly_bars.columns else "week_start"
+    df = weekly_bars[weekly_bars[_cutoff_col] <= asof_date].copy()
     df = df.sort_values("week_start").tail(lookback_weeks).reset_index(drop=True)
 
     if len(df) < 2:
