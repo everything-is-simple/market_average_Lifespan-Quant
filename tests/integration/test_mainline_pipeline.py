@@ -357,3 +357,90 @@ class TestPositionPlanStage:
     def test_lot_count_is_positive(self):
         """头寸手数必须大于零。"""
         assert self.plan.lot_count > 0
+
+
+# ---------------------------------------------------------------------------
+# P1-02：解释链组装（三件套联查验证）
+# ---------------------------------------------------------------------------
+
+class TestExplainChainAssembly:
+    """验证五阶段产物可正确组装为 StockScanTrace，字段语义一致。"""
+
+    def setup_method(self):
+        """运行完整五阶段，组装解释链。"""
+        from lq.system.orchestration import StockScanTrace
+        self.StockScanTrace = StockScanTrace
+
+        run_id = "integ-test-run-001"
+        self.ctx = build_malf_context_for_stock(CODE, SIGNAL_DATE, _MONTHLY, _WEEKLY)
+        adverse = check_adverse_conditions(CODE, SIGNAL_DATE, _DAILY, malf_ctx=self.ctx)
+        traces = run_all_detectors(CODE, SIGNAL_DATE, _DAILY, patterns=["BOF"])
+
+        self.trace_obj = StockScanTrace(
+            run_id=run_id,
+            code=CODE,
+            signal_date=SIGNAL_DATE,
+            monthly_state=self.ctx.monthly_state,
+            surface_label=self.ctx.surface_label,
+            tradeable=adverse.tradeable,
+            adverse_conditions=adverse.active_conditions,
+            adverse_notes=adverse.notes,
+            pas_traces=tuple(t.as_dict() for t in traces),
+        )
+        self.trace_dict = self.trace_obj.as_dict()
+
+    def test_explain_chain_is_stock_scan_trace(self):
+        """组装结果应为 StockScanTrace 实例。"""
+        assert isinstance(self.trace_obj, self.StockScanTrace)
+
+    def test_linkage_fields_match(self):
+        """run_id / code / signal_date 三元组应与输入一致。"""
+        assert self.trace_dict["run_id"] == "integ-test-run-001"
+        assert self.trace_dict["code"] == CODE
+        assert self.trace_dict["signal_date"] == SIGNAL_DATE.isoformat()
+
+    def test_malf_state_in_explain_chain(self):
+        """解释链应携带 monthly_state 和 surface_label（MALF 摘要）。"""
+        assert self.trace_dict["monthly_state"].startswith("BULL")
+        assert self.trace_dict["surface_label"] == "BULL_MAINSTREAM"
+
+    def test_tradeable_true_with_designed_data(self):
+        """牛市精设 fixture 下，解释链中 tradeable 应为 True。"""
+        assert self.trace_dict["tradeable"] is True
+        assert self.trace_dict["adverse_conditions"] == []
+
+    def test_pas_traces_present_when_tradeable(self):
+        """tradeable=True 时，解释链应携带 pas_traces（至少 1 条）。"""
+        assert len(self.trace_dict["pas_traces"]) >= 1
+
+    def test_bof_trace_in_explain_chain(self):
+        """解释链内的 BOF trace 应标记为 triggered=True。"""
+        bof_entries = [t for t in self.trace_dict["pas_traces"] if t["pattern"] == "BOF"]
+        assert len(bof_entries) == 1, "解释链中应有且仅有一条 BOF trace"
+        assert bof_entries[0]["triggered"] is True
+
+    def test_explain_chain_blocked_stock(self):
+        """BEAR_PERSISTING 背景下，解释链中 tradeable=False，pas_traces 为空。"""
+        from lq.malf.contracts import MalfContext
+        bear_ctx = MalfContext(
+            code=CODE,
+            signal_date=SIGNAL_DATE,
+            monthly_state="BEAR_PERSISTING",
+            weekly_flow="with_flow",
+            surface_label="BEAR_MAINSTREAM",
+        )
+        adverse = check_adverse_conditions(CODE, SIGNAL_DATE, _DAILY, malf_ctx=bear_ctx)
+        blocked = self.StockScanTrace(
+            run_id="run-bear",
+            code=CODE,
+            signal_date=SIGNAL_DATE,
+            monthly_state=bear_ctx.monthly_state,
+            surface_label=bear_ctx.surface_label,
+            tradeable=adverse.tradeable,
+            adverse_conditions=adverse.active_conditions,
+            adverse_notes=adverse.notes,
+        )
+        d = blocked.as_dict()
+        assert d["tradeable"] is False
+        assert len(d["adverse_conditions"]) > 0
+        assert d["pas_traces"] == []

@@ -30,6 +30,41 @@ from lq.position.sizing import compute_position_plan, build_exit_plan
 
 
 @dataclass(frozen=True)
+class StockScanTrace:
+    """单只股票单次扫描的完整解释链记录（三件套：MALF + 过滤 + PAS）。
+
+    用途：回溯某只股票某日为何被过滤、为何触发或未触发信号，
+          可通过 run_id + code + signal_date 三元组联查。
+    """
+
+    run_id: str
+    code: str
+    signal_date: date
+    # MALF 摘要
+    monthly_state: str
+    surface_label: str
+    # 不利条件过滤结果
+    tradeable: bool
+    adverse_conditions: tuple[str, ...]
+    adverse_notes: str
+    # PAS trace 列表（仅 tradeable=True 时填充；否则为空 tuple）
+    pas_traces: tuple[dict, ...] = ()
+
+    def as_dict(self) -> dict[str, Any]:
+        return {
+            "run_id": self.run_id,
+            "code": self.code,
+            "signal_date": self.signal_date.isoformat(),
+            "monthly_state": self.monthly_state,
+            "surface_label": self.surface_label,
+            "tradeable": self.tradeable,
+            "adverse_conditions": list(self.adverse_conditions),
+            "adverse_notes": self.adverse_notes,
+            "pas_traces": list(self.pas_traces),
+        }
+
+
+@dataclass(frozen=True)
 class SystemRunSummary:
     """系统单日扫描摘要。"""
 
@@ -41,6 +76,7 @@ class SystemRunSummary:
     pattern_counts: dict[str, int]
     top_signals: list[dict[str, Any]]   # 按 strength 排序的前 N 个信号
     scan_errors: list[dict[str, Any]] = field(default_factory=list)  # 扫描失败记录
+    stock_traces: list[dict[str, Any]] = field(default_factory=list)  # 解释链（三件套）
 
     def as_dict(self) -> dict[str, Any]:
         return {
@@ -52,6 +88,7 @@ class SystemRunSummary:
             "pattern_counts": self.pattern_counts,
             "top_signals": self.top_signals,
             "scan_errors": self.scan_errors,
+            "stock_traces": self.stock_traces,
         }
 
 
@@ -89,6 +126,7 @@ def run_daily_signal_scan(
     signals: list[PasSignal] = []
     filtered_out = 0
     scan_errors: list[dict[str, Any]] = []
+    stock_traces: list[dict[str, Any]] = []
     pattern_counts: dict[str, int] = {p: 0 for p in enabled_patterns}
 
     for code in codes:
@@ -142,10 +180,34 @@ def run_daily_signal_scan(
 
             if not adverse_result.tradeable:
                 filtered_out += 1
+                # 记录解释链（过滤掉的股票：无 PAS trace）
+                stock_traces.append(StockScanTrace(
+                    run_id=run_id,
+                    code=code,
+                    signal_date=signal_date,
+                    monthly_state=malf_ctx.monthly_state,
+                    surface_label=malf_ctx.surface_label,
+                    tradeable=False,
+                    adverse_conditions=adverse_result.active_conditions,
+                    adverse_notes=adverse_result.notes,
+                ).as_dict())
                 continue
 
             # PAS 探测（A7 五触发）
             traces = run_all_detectors(code, signal_date, daily_df, patterns=enabled_patterns)
+
+            # 记录解释链（通过过滤的股票：完整三件套）
+            stock_traces.append(StockScanTrace(
+                run_id=run_id,
+                code=code,
+                signal_date=signal_date,
+                monthly_state=malf_ctx.monthly_state,
+                surface_label=malf_ctx.surface_label,
+                tradeable=True,
+                adverse_conditions=adverse_result.active_conditions,
+                adverse_notes=adverse_result.notes,
+                pas_traces=tuple(t.as_dict() for t in traces),
+            ).as_dict())
 
             for trace in traces:
                 if not trace.triggered or trace.strength is None:
@@ -189,4 +251,5 @@ def run_daily_signal_scan(
         pattern_counts=pattern_counts,
         top_signals=top_signals,
         scan_errors=scan_errors,
+        stock_traces=stock_traces,
     )
