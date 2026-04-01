@@ -342,8 +342,11 @@ def detect_pb(
     5. 量能不过度放大（避免下跌趋势延续）
 
     struct_snap（可选）：
-        若 struct_snap.nearest_support 非 None，额外验证收盘是否守住结构支撑，
-        成立时在强度计算中加成 0.1。
+        若 struct_snap.nearest_support 非 None，守住结构支撑是触发的前置門槛：
+            adj_close >= nearest_support.price * 0.98
+        不满足时直接返回 triggered=False（结构层否决）。
+        满足门槛后在强度计算中加成 0.1。
+        struct_snap=None 或 nearest_support=None 时保持向后兼容。
     """
     pattern = PasTriggerPattern.PB.value
     history_days = len(df)
@@ -392,14 +395,22 @@ def detect_pb(
     # 第一 PB 追踪
     pb_seq = _count_pb_sequence(df, signal_date)
 
-    # 结构层支撑确认（可选）
+    # 结构支撑门槛（P1-05）
+    # struct_snap 存在且 nearest_support 有效时：守住是触发的前置条件，不是加分项
     struct_support_note = ""
     struct_bonus = 0.0
     if struct_snap is not None and struct_snap.nearest_support is not None:
-        holding_support = adj_close >= struct_snap.nearest_support.price * 0.98
-        if holding_support:
-            struct_support_note = f"，守住结构支撑({struct_snap.nearest_support.price:.2f})"
-            struct_bonus = 0.1
+        support_price = struct_snap.nearest_support.price
+        holding_support = adj_close >= support_price * 0.98
+        if not holding_support:
+            t = _base_trace(code, signal_date, pattern, history_days)
+            t["detect_reason"] = (
+                f"未守住结构支撑({support_price:.2f})，"
+                f"收盘={adj_close:.2f} < 门槛={support_price * 0.98:.2f}"
+            )
+            return PasDetectTrace(**t)
+        struct_support_note = f"，守住结构支撑({support_price:.2f})"
+        struct_bonus = 0.1
 
     if is_trending_up and valid_pullback and stop_falling and above_ma and volume_ok:
         bar_range = adj_high - adj_low

@@ -1,10 +1,11 @@
-"""P1-02 补丁测试：解释链（StockScanTrace）三件套字段完整性验证。
+"""P1-02/P1-04 补丁测试：解释链（StockScanTrace）四件套字段完整性验证。
 
 回归防护：
     - 通过过滤的股票：解释链应包含 tradeable=True + pas_traces（非空）
     - 被过滤的股票：解释链应包含 tradeable=False + adverse_conditions + 空 pas_traces
     - SystemRunSummary.stock_traces 数量应等于实际处理的股票数（跳过/异常除外）
     - 解释链字段通过 run_id + code + signal_date 可联查
+    - P1-04: structure_summary 8 字段嵌入解释链，过滤/通过两条路径均写入
 """
 
 from __future__ import annotations
@@ -15,7 +16,7 @@ from unittest.mock import MagicMock, patch
 import pandas as pd
 import pytest
 
-from lq.system.orchestration import StockScanTrace, SystemRunSummary
+from lq.system.orchestration import StockScanTrace, SystemRunSummary, _build_structure_summary
 
 
 # ---------------------------------------------------------------------------
@@ -54,12 +55,12 @@ class TestStockScanTraceContract:
         assert len(trace.adverse_conditions) > 0
 
     def test_as_dict_has_required_keys(self):
-        """as_dict() 应输出七个必要字段。"""
+        """as_dict() 应输出全部必要字段（含 P1-04 新增 structure_summary）。"""
         trace = self._make_trace(tradeable=True)
         d = trace.as_dict()
         for key in ("run_id", "code", "signal_date", "monthly_state",
                     "surface_label", "tradeable", "adverse_conditions",
-                    "adverse_notes", "pas_traces"):
+                    "adverse_notes", "structure_summary", "pas_traces"):
             assert key in d, f"as_dict() 缺少字段 {key}"
 
     def test_as_dict_signal_date_is_iso_string(self):
@@ -75,6 +76,66 @@ class TestStockScanTraceContract:
         assert d["run_id"] == "scan-2024-06-03-abc"
         assert d["code"] == "000001.SZ"
         assert d["signal_date"] == "2024-06-03"
+
+
+# ---------------------------------------------------------------------------
+# P1-04：structure_summary 字段测试
+# ---------------------------------------------------------------------------
+
+class TestStructureSummaryInExplainChain:
+    """验证 StockScanTrace.structure_summary 语义正确性（P1-04）。"""
+
+    _REQUIRED_KEYS = (
+        "has_clear_structure",
+        "nearest_support_price",
+        "nearest_support_strength",
+        "nearest_resistance_price",
+        "nearest_resistance_strength",
+        "recent_breakout_type",
+        "recent_breakout_recovered",
+        "available_space_pct",
+    )
+
+    def test_tradeable_trace_includes_structure_summary(self):
+        """tradeable=True 的解释链应携带 structure_summary 字段。"""
+        trace = StockScanTrace(
+            run_id="r1", code="000001.SZ", signal_date=date(2024, 6, 3),
+            monthly_state="BULL_PERSISTING", surface_label="BULL_MAINSTREAM",
+            tradeable=True, adverse_conditions=(), adverse_notes="",
+            structure_summary={"has_clear_structure": False},
+        )
+        d = trace.as_dict()
+        assert "structure_summary" in d
+        assert isinstance(d["structure_summary"], dict)
+
+    def test_blocked_trace_still_includes_structure_summary(self):
+        """tradeable=False 的解释链也应携带 structure_summary（复盘用）。"""
+        trace = StockScanTrace(
+            run_id="r2", code="000002.SZ", signal_date=date(2024, 6, 3),
+            monthly_state="BEAR_PERSISTING", surface_label="BEAR_MAINSTREAM",
+            tradeable=False, adverse_conditions=("BACKGROUND_NOT_SUPPORTING",),
+            adverse_notes="月线背景不支持",
+            structure_summary={"has_clear_structure": False},
+        )
+        d = trace.as_dict()
+        assert "structure_summary" in d
+        assert d["tradeable"] is False
+
+    def test_structure_summary_contains_required_fields(self):
+        """_build_structure_summary(None) 应输出全部 8 个必要字段。"""
+        summary = _build_structure_summary(None)
+        for key in self._REQUIRED_KEYS:
+            assert key in summary, f"_build_structure_summary 缺少字段 {key}"
+
+    def test_structure_summary_serializes_none_fields_stably(self):
+        """无结构位时，所有价格/强度/突破字段应稳定为 None（可序列化）。"""
+        summary = _build_structure_summary(None)
+        for key in ("nearest_support_price", "nearest_support_strength",
+                    "nearest_resistance_price", "nearest_resistance_strength",
+                    "recent_breakout_type", "recent_breakout_recovered",
+                    "available_space_pct"):
+            assert summary[key] is None, f"{key} 应为 None，实际={summary[key]}"
+        assert summary["has_clear_structure"] is False
 
 
 # ---------------------------------------------------------------------------

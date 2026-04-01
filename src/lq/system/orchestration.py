@@ -27,11 +27,49 @@ from lq.alpha.pas.detectors import run_all_detectors
 from lq.alpha.pas.contracts import PasSignal
 from lq.malf.contracts import build_signal_id
 from lq.position.sizing import compute_position_plan, build_exit_plan
+from lq.structure.contracts import StructureSnapshot
+
+
+def _build_structure_summary(snap: StructureSnapshot | None) -> dict[str, Any]:
+    """从 StructureSnapshot 提取轻量完整谡，嵌入解释链以支持 replay。"""
+    if snap is None:
+        return {
+            "has_clear_structure": False,
+            "nearest_support_price": None,
+            "nearest_support_strength": None,
+            "nearest_resistance_price": None,
+            "nearest_resistance_strength": None,
+            "recent_breakout_type": None,
+            "recent_breakout_recovered": None,
+            "available_space_pct": None,
+        }
+    return {
+        "has_clear_structure": snap.has_clear_structure,
+        "nearest_support_price": (
+            snap.nearest_support.price if snap.nearest_support else None
+        ),
+        "nearest_support_strength": (
+            snap.nearest_support.strength if snap.nearest_support else None
+        ),
+        "nearest_resistance_price": (
+            snap.nearest_resistance.price if snap.nearest_resistance else None
+        ),
+        "nearest_resistance_strength": (
+            snap.nearest_resistance.strength if snap.nearest_resistance else None
+        ),
+        "recent_breakout_type": (
+            snap.recent_breakout.breakout_type if snap.recent_breakout else None
+        ),
+        "recent_breakout_recovered": (
+            snap.recent_breakout.recovered if snap.recent_breakout else None
+        ),
+        "available_space_pct": snap.available_space_pct,
+    }
 
 
 @dataclass(frozen=True)
 class StockScanTrace:
-    """单只股票单次扫描的完整解释链记录（三件套：MALF + 过滤 + PAS）。
+    """单只股票单次扫描的完整解释链记录（四件套：MALF + 结构 + 过滤 + PAS）。
 
     用途：回溯某只股票某日为何被过滤、为何触发或未触发信号，
           可通过 run_id + code + signal_date 三元组联查。
@@ -47,6 +85,8 @@ class StockScanTrace:
     tradeable: bool
     adverse_conditions: tuple[str, ...]
     adverse_notes: str
+    # 结构位摘要（封装轻量 8 字段，支持 replay）
+    structure_summary: dict[str, Any] = field(default_factory=dict)
     # PAS trace 列表（仅 tradeable=True 时填充；否则为空 tuple）
     pas_traces: tuple[dict, ...] = ()
 
@@ -60,6 +100,7 @@ class StockScanTrace:
             "tradeable": self.tradeable,
             "adverse_conditions": list(self.adverse_conditions),
             "adverse_notes": self.adverse_notes,
+            "structure_summary": self.structure_summary,
             "pas_traces": list(self.pas_traces),
         }
 
@@ -180,7 +221,7 @@ def run_daily_signal_scan(
 
             if not adverse_result.tradeable:
                 filtered_out += 1
-                # 记录解释链（过滤掉的股票：无 PAS trace）
+                # 记录解释链（过滤掉的股票：无 PAS trace，但保留结构摘要）
                 stock_traces.append(StockScanTrace(
                     run_id=run_id,
                     code=code,
@@ -190,6 +231,7 @@ def run_daily_signal_scan(
                     tradeable=False,
                     adverse_conditions=adverse_result.active_conditions,
                     adverse_notes=adverse_result.notes,
+                    structure_summary=_build_structure_summary(struct_snap),
                 ).as_dict())
                 continue
 
@@ -200,7 +242,7 @@ def run_daily_signal_scan(
                 struct_snap=struct_snap,
             )
 
-            # 记录解释链（通过过滤的股票：完整三件套）
+            # 记录解释链（通过过滤的股票：完整四件套）
             stock_traces.append(StockScanTrace(
                 run_id=run_id,
                 code=code,
@@ -210,6 +252,7 @@ def run_daily_signal_scan(
                 tradeable=True,
                 adverse_conditions=adverse_result.active_conditions,
                 adverse_notes=adverse_result.notes,
+                structure_summary=_build_structure_summary(struct_snap),
                 pas_traces=tuple(t.as_dict() for t in traces),
             ).as_dict())
 

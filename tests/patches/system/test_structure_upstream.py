@@ -227,6 +227,48 @@ class TestDetectPbWithStructSnap:
         trace = detect_pb(_CODE, _SIGNAL_DATE, df)
         assert isinstance(trace.triggered, bool)
 
+    def test_pb_requires_holding_structure_support_when_struct_snap_present(self):
+        """struct_snap.nearest_support 存在时，守住结构支撑是 PB 触发的前置门槛。"""
+        df = self._make_pb_daily()
+        signal_close = float(df["adj_close"].iloc[-1])
+        # 支撑价比收盘高（收盘未守住，应被否决）
+        support_price_above_close = signal_close * 1.1
+        snap = _make_snap_with_support(support_price_above_close)
+        trace = detect_pb(_CODE, _SIGNAL_DATE, df, struct_snap=snap)
+        assert trace.triggered is False, (
+            f"收盘({signal_close:.2f}) 低于结构支撑({support_price_above_close:.2f})，"
+            f"PB 应被否决，实际 triggered={trace.triggered}"
+        )
+
+    def test_pb_rejects_when_close_breaks_structure_support(self):
+        """收盘跌破结构支撑（< price * 0.98）时 PB 必须返回 triggered=False。"""
+        df = self._make_pb_daily()
+        signal_close = float(df["adj_close"].iloc[-1])
+        # 精确设置：支撑价使收盘恰好低于 98% 门槛
+        support_price = signal_close / 0.97   # adj_close / support = 0.97 < 0.98
+        snap = _make_snap_with_support(support_price)
+        trace = detect_pb(_CODE, _SIGNAL_DATE, df, struct_snap=snap)
+        assert trace.triggered is False
+
+    def test_pb_detect_reason_mentions_structure_rejection(self):
+        """被结构支撑否决时 detect_reason 应明确说明'未守住结构支撑'。"""
+        df = self._make_pb_daily()
+        signal_close = float(df["adj_close"].iloc[-1])
+        support_price = signal_close * 1.05   # 高于收盘
+        snap = _make_snap_with_support(support_price)
+        trace = detect_pb(_CODE, _SIGNAL_DATE, df, struct_snap=snap)
+        assert trace.triggered is False
+        assert "未守住结构支撑" in trace.detect_reason, (
+            f"detect_reason 应包含'未守住结构支撑'：{trace.detect_reason}"
+        )
+
+    def test_pb_keeps_backward_compatibility_without_struct_snap(self):
+        """struct_snap=None 时 PB 走旧逻辑，结果类型正确（不引入额外门槛）。"""
+        df = self._make_pb_daily()
+        trace_none = detect_pb(_CODE, _SIGNAL_DATE, df, struct_snap=None)
+        trace_default = detect_pb(_CODE, _SIGNAL_DATE, df)
+        assert trace_none.triggered == trace_default.triggered
+
 
 # ---------------------------------------------------------------------------
 # run_all_detectors × struct_snap 透传
