@@ -160,8 +160,8 @@ def _check_background_not_supporting(malf_ctx: MalfContext | None) -> bool:
     if BEAR_PERSISTING_BLOCK and monthly == "BEAR_PERSISTING":
         return True
 
-    # 熊市形成阶段（可选屏蔽）
-    if not BEAR_FORMING_BLOCK and monthly == "BEAR_FORMING":
+    # 熊市形成阶段（可选屏蔽）：BEAR_FORMING_BLOCK=True 时才屏蔽
+    if BEAR_FORMING_BLOCK and monthly == "BEAR_FORMING":
         return True
 
     # 熊市高位逆势反弹背景下（逆流反弹），也屏蔽做多

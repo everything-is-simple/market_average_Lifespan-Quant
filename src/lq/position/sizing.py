@@ -3,9 +3,10 @@
 from __future__ import annotations
 
 import math
-from datetime import date, timedelta
+from datetime import date
 from uuid import uuid4
 
+from lq.core.calendar import next_trading_day
 from lq.core.contracts import (
     DEFAULT_CAPITAL_BASE,
     DEFAULT_FIXED_NOTIONAL,
@@ -49,7 +50,8 @@ def compute_position_plan(
     lot_count = max(1, math.floor(fixed_notional / (entry_price * lot_size))) * 1
     notional = lot_count * lot_size * entry_price
 
-    entry_date = signal.signal_date + timedelta(days=1)
+    # T+1 交易日语义：跳过周末与法定节假日
+    entry_date = next_trading_day(signal.signal_date)
 
     return PositionPlan(
         code=signal.code,

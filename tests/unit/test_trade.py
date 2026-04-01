@@ -20,7 +20,8 @@ def _make_state(
     return TradeManagementState(
         trade_id="test-trade-001",
         code="000001.SZ",
-        entry_date=date(2024, 6, 3),
+        signal_date=date(2024, 5, 31),   # T 日（周五）
+        entry_date=date(2024, 6, 3),     # T+1 交易日（周一）
         entry_price=entry_price,
         initial_stop_price=initial_stop,
         first_target_price=first_target,

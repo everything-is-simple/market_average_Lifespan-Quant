@@ -14,6 +14,7 @@ from pathlib import Path
 from typing import Any
 from uuid import uuid4
 
+import duckdb
 import pandas as pd
 
 from lq.core.contracts import PasTriggerPattern, PAS_TRIGGER_STATUS, PasTriggerStatus
@@ -39,6 +40,7 @@ class SystemRunSummary:
     signals_found: int
     pattern_counts: dict[str, int]
     top_signals: list[dict[str, Any]]   # 按 strength 排序的前 N 个信号
+    scan_errors: list[dict[str, Any]] = field(default_factory=list)  # 扫描失败记录
 
     def as_dict(self) -> dict[str, Any]:
         return {
@@ -49,6 +51,7 @@ class SystemRunSummary:
             "signals_found": self.signals_found,
             "pattern_counts": self.pattern_counts,
             "top_signals": self.top_signals,
+            "scan_errors": self.scan_errors,
         }
 
 
@@ -85,24 +88,23 @@ def run_daily_signal_scan(
     run_id = f"scan-{signal_date.isoformat()}-{uuid4().hex[:8]}"
     signals: list[PasSignal] = []
     filtered_out = 0
+    scan_errors: list[dict[str, Any]] = []
     pattern_counts: dict[str, int] = {p: 0 for p in enabled_patterns}
-
-    import duckdb  # 延迟导入，避免在 import 时强制依赖数据库
 
     for code in codes:
         try:
             # 读取日线数据
             with duckdb.connect(str(db_paths.market_base), read_only=True) as conn:
+                # DESC 拿最近 120 根，再按日期升序还原（保证最后一根是 signal_date）
                 daily_df: pd.DataFrame = conn.execute(
                     """SELECT date, adj_open, adj_high, adj_low, adj_close,
                               volume, volume_ma20, ma10, ma20
                        FROM adj_daily_bar
                        WHERE code = ? AND date <= ?
-                       ORDER BY date
+                       ORDER BY date DESC
                        LIMIT 120""",
                     [code, signal_date],
                 ).df()
-
                 monthly_df: pd.DataFrame = conn.execute(
                     "SELECT * FROM monthly_bar WHERE code = ? ORDER BY month_start",
                     [code],
@@ -113,8 +115,10 @@ def run_daily_signal_scan(
                     [code],
                 ).df()
 
+            # 先检查空，再排序（避免无 date 列时 KeyError）
             if daily_df.empty:
                 continue
+            daily_df = daily_df.sort_values("date").reset_index(drop=True)
 
             # 构建 MALF 上下文
             malf_ctx = build_malf_context_for_stock(code, signal_date, monthly_df, weekly_df)
@@ -163,7 +167,13 @@ def run_daily_signal_scan(
                 signals.append(sig)
                 pattern_counts[trace.pattern] = pattern_counts.get(trace.pattern, 0) + 1
 
-        except Exception:
+        except Exception as exc:
+            # 记录失败，不静默吞异常；汇总结果保留错误轨迹
+            scan_errors.append({
+                "code": code,
+                "stage": "scan",
+                "error": str(exc),
+            })
             continue
 
     # 按强度排序
@@ -178,4 +188,5 @@ def run_daily_signal_scan(
         signals_found=len(signals),
         pattern_counts=pattern_counts,
         top_signals=top_signals,
+        scan_errors=scan_errors,
     )

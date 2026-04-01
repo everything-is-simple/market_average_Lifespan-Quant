@@ -41,7 +41,8 @@ class TradeManagementState:
 
     trade_id: str
     code: str
-    entry_date: date
+    signal_date: date        # T 日（信号产生日）
+    entry_date: date         # T+1 日（实际入场日，交易日语义）
     entry_price: float
     initial_stop_price: float
     first_target_price: float
@@ -273,8 +274,8 @@ class TradeManager:
         return TradeRecord(
             trade_id=self.state.trade_id,
             code=self.state.code,
-            signal_date=self.state.entry_date,  # 用 entry_date 作为 signal 代理
-            entry_date=self.state.entry_date,
+            signal_date=self.state.signal_date,  # T 日：真实信号产生日
+            entry_date=self.state.entry_date,    # T+1 日：真实入场日（交易日语义）
             exit_date=exit_date,
             signal_pattern=self.state.signal_pattern,
             surface_label=self.state.surface_label,
