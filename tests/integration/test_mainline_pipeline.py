@@ -269,15 +269,22 @@ class TestFilterStage:
 # ---------------------------------------------------------------------------
 
 class TestPasDetectorStage:
+    def setup_method(self):
+        self._struct_snap = build_structure_snapshot(CODE, SIGNAL_DATE, _DAILY)
+
     def test_bof_returns_trace(self):
         """BOF 探测器应返回 PasDetectTrace 对象。"""
-        traces = run_all_detectors(CODE, SIGNAL_DATE, _DAILY, patterns=["BOF"])
+        traces = run_all_detectors(
+            CODE, SIGNAL_DATE, _DAILY, patterns=["BOF"], struct_snap=self._struct_snap
+        )
         assert len(traces) == 1
         assert isinstance(traces[0], PasDetectTrace)
 
     def test_bof_triggers_on_designed_fixture(self):
         """精心设计的日线 fixture 应使 BOF 触发（triggered=True）。"""
-        traces = run_all_detectors(CODE, SIGNAL_DATE, _DAILY, patterns=["BOF"])
+        traces = run_all_detectors(
+            CODE, SIGNAL_DATE, _DAILY, patterns=["BOF"], struct_snap=self._struct_snap
+        )
         trace = traces[0]
         assert trace.triggered, (
             f"BOF 未触发，原因：{trace.detect_reason}\n"
@@ -286,14 +293,16 @@ class TestPasDetectorStage:
 
     def test_bof_strength_is_in_range(self):
         """BOF 触发强度应在 [0, 1] 范围内。"""
-        traces = run_all_detectors(CODE, SIGNAL_DATE, _DAILY, patterns=["BOF"])
+        traces = run_all_detectors(
+            CODE, SIGNAL_DATE, _DAILY, patterns=["BOF"], struct_snap=self._struct_snap
+        )
         trace = traces[0]
         if trace.triggered:
             assert 0.0 <= trace.strength <= 1.0
 
     def test_run_all_returns_five_traces(self):
         """run_all_detectors 默认运行全部五个探测器，应返回 5 个 trace。"""
-        traces = run_all_detectors(CODE, SIGNAL_DATE, _DAILY)
+        traces = run_all_detectors(CODE, SIGNAL_DATE, _DAILY, struct_snap=self._struct_snap)
         assert len(traces) == len(PasTriggerPattern)
 
 
@@ -320,7 +329,10 @@ class TestPositionPlanStage:
     def setup_method(self):
         """构造 BOF 信号和位置计划。"""
         ctx = build_malf_context_for_stock(CODE, SIGNAL_DATE, _MONTHLY, _WEEKLY)
-        traces = run_all_detectors(CODE, SIGNAL_DATE, _DAILY, patterns=["BOF"])
+        struct_snap = build_structure_snapshot(CODE, SIGNAL_DATE, _DAILY)
+        traces = run_all_detectors(
+            CODE, SIGNAL_DATE, _DAILY, patterns=["BOF"], struct_snap=struct_snap
+        )
         bof_trace = traces[0]
         assert bof_trace.triggered, f"前置条件：BOF 应触发，得到 {bof_trace.detect_reason}"
         signal = _build_pas_signal(bof_trace, ctx)
@@ -374,7 +386,10 @@ class TestExplainChainAssembly:
         run_id = "integ-test-run-001"
         self.ctx = build_malf_context_for_stock(CODE, SIGNAL_DATE, _MONTHLY, _WEEKLY)
         adverse = check_adverse_conditions(CODE, SIGNAL_DATE, _DAILY, malf_ctx=self.ctx)
-        traces = run_all_detectors(CODE, SIGNAL_DATE, _DAILY, patterns=["BOF"])
+        struct_snap = build_structure_snapshot(CODE, SIGNAL_DATE, _DAILY)
+        traces = run_all_detectors(
+            CODE, SIGNAL_DATE, _DAILY, patterns=["BOF"], struct_snap=struct_snap
+        )
 
         self.trace_obj = StockScanTrace(
             run_id=run_id,

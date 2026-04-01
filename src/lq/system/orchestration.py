@@ -193,8 +193,12 @@ def run_daily_signal_scan(
                 ).as_dict())
                 continue
 
-            # PAS 探测（A7 五触发）
-            traces = run_all_detectors(code, signal_date, daily_df, patterns=enabled_patterns)
+            # PAS 探测（A7 五触发）— 传入 struct_snap 实现结构位上游化
+            traces = run_all_detectors(
+                code, signal_date, daily_df,
+                patterns=enabled_patterns,
+                struct_snap=struct_snap,
+            )
 
             # 记录解释链（通过过滤的股票：完整三件套）
             stock_traces.append(StockScanTrace(

@@ -15,9 +15,10 @@ from datetime import date
 import numpy as np
 import pandas as pd
 
-from lq.core.contracts import PasTriggerPattern
+from lq.core.contracts import PasTriggerPattern, BreakoutType
 from lq.alpha.pas.contracts import PasDetectTrace, PasSignal
 from lq.malf.contracts import build_signal_id
+from lq.structure.contracts import StructureSnapshot
 
 
 # ---------------------------------------------------------------------------
@@ -115,15 +116,21 @@ def detect_bof(
     code: str,
     signal_date: date,
     df: pd.DataFrame,
+    struct_snap: StructureSnapshot | None = None,
 ) -> PasDetectTrace:
     """BOF（Breakout Failure）探测器。
 
     触发条件：
-    1. 存在明确的支撑区（近 20 日低点群）
+    1. 存在明确的支撑区（优先使用 struct_snap.nearest_support；否则由近 20 日低点群推导）
     2. 当日最低价跌破支撑区下沿（假跌破）
     3. 当日收盘价收回支撑区以上（收回确认）
     4. 收盘位置偏强（收在当日价格区间的上半部分）
     5. 量能不过度萎缩（≥ 20日均量的 0.6 倍）
+
+    struct_snap（可选）：
+        若 struct_snap.nearest_support 非 None，直接使用其 price 作为规范支撑位，
+        跳过内部 pivot 推导。struct_snap.recent_breakout == FALSE_BREAKOUT 时额外
+        记录结构层确认信息，并对强度计算加成。
     """
     pattern = PasTriggerPattern.BOF.value
     history_days = len(df)
@@ -149,15 +156,26 @@ def detect_bof(
     volume = float(last["volume"])
     volume_ma20 = float(last["volume_ma20"])
 
-    # 支撑区：近 20 日（不含当日）局部低点的均值
-    pivot_lows = _find_pivot_lows(window.tail(20))
-    if not pivot_lows:
-        t = _base_trace(code, signal_date, pattern, history_days)
-        t["detect_reason"] = "NO_PIVOT_LOW_FOUND"
-        return PasDetectTrace(**t)
-
-    support_level = np.mean([p[1] for p in pivot_lows[-3:]])  # 最近3个低点均值
-    support_band_lower = support_level * 0.98  # 支撑区下沿（允许 2% 误差）
+    # 支撑区：优先使用结构模块规范支撑位；否则由近 20 日 pivot 低点推导
+    struct_confirmed_bof = False
+    if struct_snap is not None and struct_snap.nearest_support is not None:
+        support_level = struct_snap.nearest_support.price
+        support_band_lower = support_level * 0.98
+        # 若结构模块已识别 FALSE_BREAKOUT 且已收回，则视为结构层二次确认
+        if (
+            struct_snap.recent_breakout is not None
+            and struct_snap.recent_breakout.breakout_type == BreakoutType.FALSE_BREAKOUT
+            and struct_snap.recent_breakout.recovered
+        ):
+            struct_confirmed_bof = True
+    else:
+        pivot_lows = _find_pivot_lows(window.tail(20))
+        if not pivot_lows:
+            t = _base_trace(code, signal_date, pattern, history_days)
+            t["detect_reason"] = "NO_PIVOT_LOW_FOUND"
+            return PasDetectTrace(**t)
+        support_level = np.mean([p[1] for p in pivot_lows[-3:]])  # 最近3个低点均值
+        support_band_lower = support_level * 0.98  # 支撑区下沿（允许 2% 误差）
 
     # 条件1：日内最低价跌破支撑下沿
     broke_below = adj_low < support_band_lower
@@ -177,18 +195,21 @@ def detect_bof(
     volume_ok = volume_ma20 < EPSILON or volume / volume_ma20 >= 0.6
 
     if broke_below and recovered and strong_close and volume_ok:
-        # 强度计算：收盘位置 + 量能 + 穿越深度
+        # 强度计算：收盘位置 + 量能 + 穿越深度 + 结构层确认加成
         penetration_depth = (support_level - adj_low) / max(support_level, EPSILON)
+        struct_bonus = 0.1 if struct_confirmed_bof else 0.0
         strength = _clip(
             close_position * 0.5
             + min(volume / max(volume_ma20, EPSILON), 2.0) * 0.2
             + min(penetration_depth * 5, 0.3)
+            + struct_bonus
         )
         t = _base_trace(code, signal_date, pattern, history_days)
         t["triggered"] = True
         t["strength"] = strength
+        struct_note = "（结构层已确认 FALSE_BREAKOUT）" if struct_confirmed_bof else ""
         t["detect_reason"] = (
-            f"假跌破支撑({support_level:.2f})并收回，"
+            f"假跌破支撑({support_level:.2f})并收回{struct_note}，"
             f"收盘位置={close_position:.2f}，"
             f"量比={volume / max(volume_ma20, EPSILON):.2f}"
         )
@@ -309,6 +330,7 @@ def detect_pb(
     code: str,
     signal_date: date,
     df: pd.DataFrame,
+    struct_snap: StructureSnapshot | None = None,
 ) -> PasDetectTrace:
     """PB（Pullback）探测器 — 上涨趋势中的正常回踩。
 
@@ -318,6 +340,10 @@ def detect_pb(
     3. 当日出现止跌信号（收盘高于前一日收盘，或收阳线）
     4. 收盘高于关键均线（ma10 或 ma20）
     5. 量能不过度放大（避免下跌趋势延续）
+
+    struct_snap（可选）：
+        若 struct_snap.nearest_support 非 None，额外验证收盘是否守住结构支撑，
+        成立时在强度计算中加成 0.1。
     """
     pattern = PasTriggerPattern.PB.value
     history_days = len(df)
@@ -366,6 +392,15 @@ def detect_pb(
     # 第一 PB 追踪
     pb_seq = _count_pb_sequence(df, signal_date)
 
+    # 结构层支撑确认（可选）
+    struct_support_note = ""
+    struct_bonus = 0.0
+    if struct_snap is not None and struct_snap.nearest_support is not None:
+        holding_support = adj_close >= struct_snap.nearest_support.price * 0.98
+        if holding_support:
+            struct_support_note = f"，守住结构支撑({struct_snap.nearest_support.price:.2f})"
+            struct_bonus = 0.1
+
     if is_trending_up and valid_pullback and stop_falling and above_ma and volume_ok:
         bar_range = adj_high - adj_low
         close_pos = (adj_close - adj_low) / max(bar_range, EPSILON)
@@ -373,6 +408,7 @@ def detect_pb(
             close_pos * 0.4
             + (0.3 if pb_seq == 1 else 0.1)  # 第一 PB 加分
             + (1.0 - pullback_pct / 0.25) * 0.3
+            + struct_bonus
         )
         t = _base_trace(code, signal_date, pattern, history_days)
         t["triggered"] = True
@@ -381,7 +417,7 @@ def detect_pb(
         t["detect_reason"] = (
             f"上升趋势回踩 {pullback_pct:.1%}，"
             f"第{pb_seq}次PB，"
-            f"收盘企稳于均线上方"
+            f"收盘企稳于均线上方{struct_support_note}"
         )
         return PasDetectTrace(**t)
 
@@ -598,19 +634,25 @@ def run_all_detectors(
     signal_date: date,
     df: pd.DataFrame,
     patterns: list[str] | None = None,
+    struct_snap: StructureSnapshot | None = None,
 ) -> list[PasDetectTrace]:
-    """对单只股票运行指定（或全部）PAS 探测器。"""
+    """对单只股票运行指定（或全部）PAS 探测器。
+
+    struct_snap（可选）：
+        传入结构位快照，由 BOF 和 PB 显式消费（上游化）。
+        其他探测器（BPB/TST/CPB）暂不消费，接口预留以备后续扩展。
+    """
     all_patterns = patterns or [p.value for p in PasTriggerPattern]
-    dispatcher = {
-        PasTriggerPattern.BOF.value: detect_bof,
-        PasTriggerPattern.BPB.value: detect_bpb,
-        PasTriggerPattern.PB.value: detect_pb,
-        PasTriggerPattern.TST.value: detect_tst,
-        PasTriggerPattern.CPB.value: detect_cpb,
-    }
     results = []
     for pattern in all_patterns:
-        fn = dispatcher.get(pattern)
-        if fn:
-            results.append(fn(code, signal_date, df))
+        if pattern == PasTriggerPattern.BOF.value:
+            results.append(detect_bof(code, signal_date, df, struct_snap=struct_snap))
+        elif pattern == PasTriggerPattern.PB.value:
+            results.append(detect_pb(code, signal_date, df, struct_snap=struct_snap))
+        elif pattern == PasTriggerPattern.BPB.value:
+            results.append(detect_bpb(code, signal_date, df))
+        elif pattern == PasTriggerPattern.TST.value:
+            results.append(detect_tst(code, signal_date, df))
+        elif pattern == PasTriggerPattern.CPB.value:
+            results.append(detect_cpb(code, signal_date, df))
     return results
