@@ -59,8 +59,10 @@ def classify_monthly_state(
         return "BEAR_FORMING"   # 无数据时默认保守状态
 
     # 用 trade_date（月末日）截断可避免月中扫描纳入未来收盘；无该列时向后兼容
+    # pd.to_datetime() 屏蔽 DuckDB datetime64[us/ns] 与 Python date 的类型差异
     _cutoff_col = "trade_date" if "trade_date" in monthly_bars.columns else "month_start"
-    df = monthly_bars[monthly_bars[_cutoff_col] <= asof_date].copy()
+    _cutoff_ts = pd.Timestamp(asof_date)
+    df = monthly_bars[pd.to_datetime(monthly_bars[_cutoff_col]) <= _cutoff_ts].copy()
     df = df.sort_values("month_start").tail(lookback_months).reset_index(drop=True)
 
     if len(df) < MONTHLY_LONG_MIN_BAR_COUNT:
@@ -129,8 +131,10 @@ def compute_monthly_strength(
     if monthly_bars.empty:
         return 0.5
 
+    # pd.to_datetime() 屏蔽 DuckDB datetime64[us/ns] 与 Python date 的类型差异
     _cutoff_col = "trade_date" if "trade_date" in monthly_bars.columns else "month_start"
-    df = monthly_bars[monthly_bars[_cutoff_col] <= asof_date].copy()
+    _cutoff_ts = pd.Timestamp(asof_date)
+    df = monthly_bars[pd.to_datetime(monthly_bars[_cutoff_col]) <= _cutoff_ts].copy()
     df = df.sort_values("month_start").tail(lookback_months + 1).reset_index(drop=True)
 
     if len(df) < 2:

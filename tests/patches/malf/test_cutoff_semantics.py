@@ -217,3 +217,118 @@ class TestCutoffDoesNotBreakMalfResult:
         state = classify_monthly_state(df, asof)
         # 24 根等比增长月线应为牛市态
         assert state.startswith("BULL"), f"期望牛市态，实际得到 {state}"
+
+
+# ---------------------------------------------------------------------------
+# P2-03: DuckDB datetime64 dtype 回归测试
+# ---------------------------------------------------------------------------
+
+def _as_datetime64(df: pd.DataFrame, *cols: str) -> pd.DataFrame:
+    """将指定列转为 datetime64[ns]，模拟 DuckDB .df() 返回的 DATE 列 dtype。"""
+    df = df.copy()
+    for col in cols:
+        if col in df.columns:
+            df[col] = pd.to_datetime(df[col])
+    return df
+
+
+class TestDatetime64DtypeCompatibility:
+    """P2-03 回归：DuckDB .df() 返回 datetime64 列时，截断比较不应 TypeError。
+
+    根因：Python date 与 datetime64[ns] 直接 <= 比较会抛
+    TypeError: Invalid comparison between dtype=datetime64[...] and date。
+    修复：pd.to_datetime(col) <= pd.Timestamp(asof_date)。
+    """
+
+    def test_weekly_classify_flow_with_datetime64_trade_date(self):
+        """trade_date 列为 datetime64[ns] 时，classify_weekly_flow 不应 TypeError。"""
+        asof = date(2024, 6, 3)
+        df = _make_weekly_with_trade_date(n=10, asof_date=asof)
+        df = _as_datetime64(df, "trade_date", "week_start")
+
+        # 不应抛异常
+        result = classify_weekly_flow(df, "BULL_PERSISTING", asof)
+        assert result in ("with_flow", "against_flow")
+
+    def test_weekly_strength_with_datetime64_trade_date(self):
+        """trade_date 列为 datetime64[ns] 时，compute_weekly_strength 不应 TypeError。"""
+        asof = date(2024, 6, 3)
+        df = _make_weekly_with_trade_date(n=10, asof_date=asof)
+        df = _as_datetime64(df, "trade_date", "week_start")
+
+        strength = compute_weekly_strength(df, asof)
+        assert 0.0 <= strength <= 1.0
+
+    def test_monthly_classify_state_with_datetime64_trade_date(self):
+        """trade_date 列为 datetime64[ns] 时，classify_monthly_state 不应 TypeError。"""
+        asof = date(2024, 6, 3)
+        df = _make_monthly_with_trade_date(n=24, asof_date=asof)
+        df = _as_datetime64(df, "trade_date", "month_start")
+
+        state = classify_monthly_state(df, asof)
+        assert isinstance(state, str)
+        assert len(state) > 0
+
+    def test_monthly_strength_with_datetime64_trade_date(self):
+        """trade_date 列为 datetime64[ns] 时，compute_monthly_strength 不应 TypeError。"""
+        asof = date(2024, 6, 3)
+        df = _make_monthly_with_trade_date(n=24, asof_date=asof)
+        df = _as_datetime64(df, "trade_date", "month_start")
+
+        strength = compute_monthly_strength(df, asof)
+        assert 0.0 <= strength <= 1.0
+
+    def test_weekly_fallback_week_start_datetime64(self):
+        """无 trade_date 列，week_start 为 datetime64[ns] 时，回退路径不应 TypeError。"""
+        asof = date(2024, 6, 3)
+        rows = []
+        close = 10.0
+        for i in range(8):
+            week_start = date(2024, 4, 1) + timedelta(weeks=i)
+            rows.append({
+                "week_start": week_start,
+                "close": round(close + i * 0.1, 2),
+                "high": round(close + i * 0.1 + 0.5, 2),
+                "low": round(close + i * 0.1 - 0.3, 2),
+            })
+        df = pd.DataFrame(rows)
+        df = _as_datetime64(df, "week_start")   # 模拟 DuckDB 返回 datetime64
+
+        result = classify_weekly_flow(df, "BULL_PERSISTING", asof)
+        assert result in ("with_flow", "against_flow")
+
+    def test_monthly_fallback_month_start_datetime64(self):
+        """无 trade_date 列，month_start 为 datetime64[ns] 时，回退路径不应 TypeError。"""
+        asof = date(2024, 6, 3)
+        rows = []
+        close = 5000.0
+        for i in range(12):
+            ms = date(2023, 6 + i if 6 + i <= 12 else 6 + i - 12,
+                      1) if 6 + i <= 12 else date(2024, 6 + i - 12, 1)
+            rows.append({
+                "month_start": ms,
+                "close": round(close * (1.03 ** i), 2),
+                "high": round(close * (1.03 ** i) * 1.05, 2),
+                "low": round(close * (1.03 ** i) * 0.95, 2),
+                "volume": 500_000_000,
+            })
+        df = pd.DataFrame(rows)
+        df = _as_datetime64(df, "month_start")   # 模拟 DuckDB 返回 datetime64
+
+        state = classify_monthly_state(df, asof)
+        assert isinstance(state, str)
+
+    def test_cutoff_excludes_future_bar_with_datetime64(self):
+        """datetime64 dtype 下，trade_date > asof 的 bar 仍应被截断（不纳入计算）。"""
+        asof = date(2024, 6, 3)  # 周一
+        df = _make_weekly_with_trade_date(n=5, asof_date=asof)
+        # 最后一根 week_start=asof, trade_date=asof+4 > asof，应被截断
+        assert df.iloc[-1]["trade_date"] > asof
+        n_before = len(df)
+
+        df = _as_datetime64(df, "trade_date", "week_start")
+
+        # 直接验证 pd.to_datetime 后过滤行为
+        cutoff_ts = pd.Timestamp(asof)
+        filtered = df[pd.to_datetime(df["trade_date"]) <= cutoff_ts]
+        assert len(filtered) == n_before - 1, "最后一根 trade_date > asof 的 bar 应被过滤掉"

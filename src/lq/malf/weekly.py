@@ -42,8 +42,10 @@ def classify_weekly_flow(
         return "with_flow" if monthly_state.startswith("BULL") else "against_flow"
 
     # 用 trade_date（周末日）截断可避免周中扫描纳入未来收盘；无该列时向后兼容
+    # pd.to_datetime() 屏蔽 DuckDB datetime64[us/ns] 与 Python date 的类型差异
     _cutoff_col = "trade_date" if "trade_date" in weekly_bars.columns else "week_start"
-    df = weekly_bars[weekly_bars[_cutoff_col] <= asof_date].copy()
+    _cutoff_ts = pd.Timestamp(asof_date)
+    df = weekly_bars[pd.to_datetime(weekly_bars[_cutoff_col]) <= _cutoff_ts].copy()
     df = df.sort_values("week_start").tail(lookback_weeks).reset_index(drop=True)
 
     if len(df) < 2:
@@ -80,8 +82,10 @@ def compute_weekly_strength(
         return 0.5
 
     # 用 trade_date（周末日）截断可避免周中扫描纳入未来收盘；无该列时向后兼容
+    # pd.to_datetime() 屏蔽 DuckDB datetime64[us/ns] 与 Python date 的类型差异
     _cutoff_col = "trade_date" if "trade_date" in weekly_bars.columns else "week_start"
-    df = weekly_bars[weekly_bars[_cutoff_col] <= asof_date].copy()
+    _cutoff_ts = pd.Timestamp(asof_date)
+    df = weekly_bars[pd.to_datetime(weekly_bars[_cutoff_col]) <= _cutoff_ts].copy()
     df = df.sort_values("week_start").tail(lookback_weeks).reset_index(drop=True)
 
     if len(df) < 2:
