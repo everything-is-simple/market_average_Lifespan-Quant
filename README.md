@@ -1,46 +1,86 @@
 # Lifespan-Quant
 
-`Lifespan-Quant` 是基于**市场平均寿命框架（MALF）**重构的本地优先 A 股研究执行系统。
+`Lifespan-Quant` 是面向中国 A 股的**市场平均寿命量化系统（第二代重构版）**。
 
-它在继承 MarketLifespan-Quant 主线能力的基础上，吸收了以下优先级 A 研究方向：
+---
 
-1. **结构位统一合同**（A1）— 水平关键位、波段高低点、测试/回踩点、突破后新支撑/阻力
-2. **突破家族语义**（A2）— 有效突破 / 假突破 / 测试 / 回踩确认语言正式化
-3. **二次入场 / 第一 PB**（A3）— 追踪 PB 序号，第一 PB 假说进入正式验证轨道
-4. **不利市场条件过滤器**（A4）— "不做"语言冻结成统一过滤合同
-5. **交易管理模板**（A5）— 入场后演化生命周期正式化
-
-## 模块职责
-
-| 模块 | 职责 |
-|------|------|
-| `core` | 公共类型、路径合同、ID、跨模块枚举 |
-| `data` | 市场数据采集（baostock）、清洗、落盘、增量更新 |
-| `malf` | 市场平均寿命框架：`monthly_state_8 / weekly_flow_relation / pas_context` |
-| `structure` | 统一结构位合同：关键位识别、突破分类（新增） |
-| `alpha/pas` | 五 trigger：`BOF / BPB / PB / TST / CPB` + 16 格验证框架 + 第一 PB 追踪 |
-| `filter` | 不利市场条件过滤器（新增） |
-| `position` | 1R 风险单位、头寸规模、退出合同 |
-| `trade` | 交易管理模板、执行 runtime（新增模板层） |
-| `system` | 编排、回测、治理检查 |
-
-## 外部目录口径（五目录纪律）
-
-| 目录 | 用途 |
-|------|------|
-| `G:\Lifespan-Quant` | 代码、文档、测试、治理 |
-| `G:\Lifespan-data` | 正式数据库（`raw_market / market_base / research_lab / malf / trade_runtime`） |
-| `G:\Lifespan-temp` | working DB、缓存、试跑产物 |
-| `G:\Lifespan-report` | 报表、图表、正式导出 |
-| `G:\Lifespan-Validated` | 跨版本验证资产快照 |
-
-## 当前主线
+## 三代血统
 
 ```
-data → malf → structure(filter) → alpha/pas → position → trade → system
+爷爷系统（EmotionQuant-gamma）→ 父系统（MarketLifespan-Quant）→ 本系统
 ```
 
-执行语义：`signal_date=T`，`execute_date=T+1`，成交价 = `T+1` 开盘价。
+| 继承来源 | 继承内容 |
+|----------|----------|
+| 爷爷系统 | 执行语义（T+1 Open）、合同传递模式、代码规范 |
+| 父系统 | 5 目录纪律、5 数据库架构、MALF 三层主轴、PAS 触发器治理、mootdx 数据源 |
+| **本系统新增** | `structure` 模块（结构位语言）、`filter` 模块（不利条件过滤）、`TradeManager` 5 阶段状态机 |
+
+---
+
+## 九模块架构
+
+| 模块 | 职责 | 数据库 |
+|------|------|--------|
+| `core` | 公共类型、路径合同、跨模块枚举 | 无 |
+| `data` | 市场数据采集（mootdx）、清洗、落盘 | raw_market / market_base |
+| `malf` | 市场平均寿命框架：monthly_state_8 / weekly_flow | malf |
+| `structure` | 统一结构位合同：波段高低点、突破分类 **（新增）** | 无 |
+| `filter` | 不利市场条件过滤器：5 类条件检测 **（新增）** | 无 |
+| `alpha/pas` | 五触发器：BOF/BPB/PB/TST/CPB + 16 格验证 | research_lab |
+| `position` | 1R 风险单位、头寸规模、退出合同 | research_lab |
+| `trade` | 交易管理模板、执行 runtime、TradeManager **（增强）** | trade_runtime |
+| `system` | 编排总控、回测、治理检查 | trade_runtime |
+
+---
+
+## 主线链路
+
+```
+data → malf → structure → filter → alpha/pas → position → trade → system
+```
+
+**执行语义**：`signal_date=T`，`execute_date=T+1`，成交价 = `T+1` 开盘价
+
+**与父系统差异**：新增 `structure → filter` 两层（在 malf 之后、alpha 之前）
+
+---
+
+## 五目录纪律
+
+| 目录 | 用途 | 禁止存放 |
+|------|------|----------|
+| `G:\Lifespan-Quant` | 代码、文档、测试、治理 | 数据库、日志、缓存 |
+| `G:\Lifespan-data` | 正式数据库与数据产物 | 代码、临时文件 |
+| `G:\Lifespan-temp` | 临时产物、pytest、benchmark | 正式代码/数据库 |
+| `G:\Lifespan-report` | 人读报告、图表、导出物 | 代码 |
+| `G:\Lifespan-Validated` | 跨版本验证资产快照 | 普通临时产物 |
+
+---
+
+## 五数据库
+
+| DB | 路径 | Owner | 内容 |
+|----|------|-------|------|
+| raw_market | Lifespan-data/raw/ | data | mootdx 本地 .day + gbbq 除权除息 |
+| market_base | Lifespan-data/base/ | data | 复权价、均线、量比 |
+| research_lab | Lifespan-data/research/ | alpha | PAS 信号、选中 trace |
+| malf | Lifespan-data/malf/ | malf | MALF 三层主轴输出 |
+| trade_runtime | Lifespan-data/trade/ | trade/system | 执行合同、回测结果 |
+
+---
+
+## PAS 触发器状态
+
+| 触发器 | 状态 | 说明 |
+|--------|------|------|
+| BOF | MAINLINE | 主线可用 |
+| PB | CONDITIONAL | 条件格准入 |
+| BPB | **REJECTED** | 永久拒绝 |
+| TST | PENDING | 待独立验证 |
+| CPB | PENDING | 待独立验证 |
+
+---
 
 ## 快速开始
 
@@ -50,7 +90,18 @@ pytest tests/unit -q
 python scripts/data/bootstrap_storage.py
 ```
 
+---
+
+## 文档入口
+
+- **系统概述**：`docs/01-design/00-system-overview-20260401.md`
+- **模块设计**：`docs/01-design/modules/<module>/`
+- **代理规则**：`AGENTS.md`
+
+---
+
 ## 参考来源
 
-- `G:\MarketLifespan-Quant\docs\04-reference\` 下系统参考总图
-- MarketLifespan-Quant（父系统）验证能力与 BOF/PB 三年数据
+- 父系统：`G:\MarketLifespan-Quant`（MALF 三层主轴、PAS 触发器验证、BOF/PB 三年数据）
+- 爷爷系统：`G:\。backups\EmotionQuant-gamma`（执行语义、合同传递模式）
+- 理论来源：YTC（Lance Beggs）— 结构位语言、不利条件过滤
