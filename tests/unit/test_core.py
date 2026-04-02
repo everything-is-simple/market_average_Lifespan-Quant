@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import json
 import pytest
+from datetime import date
 from pathlib import Path
 
 from lq.core.contracts import (
@@ -109,3 +111,211 @@ class TestPaths:
         assert dbs.research_lab.name == "research_lab.duckdb"
         assert dbs.malf.name == "malf.duckdb"
         assert dbs.trade_runtime.name == "trade_runtime.duckdb"
+
+
+class TestJsonCheckpointStore:
+    """JsonCheckpointStore 单元测试。"""
+
+    def test_exists_false_when_no_file(self, tmp_path):
+        from lq.core.checkpoint import JsonCheckpointStore
+        store = JsonCheckpointStore(tmp_path / "cp.json")
+        assert store.exists is False
+
+    def test_load_returns_none_when_no_file(self, tmp_path):
+        from lq.core.checkpoint import JsonCheckpointStore
+        store = JsonCheckpointStore(tmp_path / "cp.json")
+        assert store.load() is None
+
+    def test_save_and_load_roundtrip(self, tmp_path):
+        from lq.core.checkpoint import JsonCheckpointStore
+        store = JsonCheckpointStore(tmp_path / "cp.json")
+        payload = {"status": "running", "step": 3}
+        store.save(payload)
+        assert store.exists is True
+        loaded = store.load()
+        assert loaded == payload
+
+    def test_update_merges_fields(self, tmp_path):
+        from lq.core.checkpoint import JsonCheckpointStore
+        store = JsonCheckpointStore(tmp_path / "cp.json")
+        store.save({"status": "running", "step": 1})
+        store.update(step=2, extra="ok")
+        loaded = store.load()
+        assert loaded["status"] == "running"
+        assert loaded["step"] == 2
+        assert loaded["extra"] == "ok"
+
+    def test_clear_removes_file(self, tmp_path):
+        from lq.core.checkpoint import JsonCheckpointStore
+        store = JsonCheckpointStore(tmp_path / "cp.json")
+        store.save({"x": 1})
+        store.clear()
+        assert store.exists is False
+
+    def test_clear_on_nonexistent_file_is_silent(self, tmp_path):
+        from lq.core.checkpoint import JsonCheckpointStore
+        store = JsonCheckpointStore(tmp_path / "cp.json")
+        store.clear()  # 不抛异常
+
+    def test_save_creates_parent_directories(self, tmp_path):
+        from lq.core.checkpoint import JsonCheckpointStore
+        deep_path = tmp_path / "a" / "b" / "c" / "cp.json"
+        store = JsonCheckpointStore(deep_path)
+        store.save({"ok": True})
+        assert deep_path.exists()
+
+
+class TestResumableHelpers:
+    """resumable 工具函数单元测试。"""
+
+    def test_stable_json_dumps_sorts_keys(self):
+        from lq.core.resumable import stable_json_dumps
+        d1 = {"b": 2, "a": 1}
+        d2 = {"a": 1, "b": 2}
+        assert stable_json_dumps(d1) == stable_json_dumps(d2)
+
+    def test_build_resume_digest_deterministic(self):
+        from lq.core.resumable import build_resume_digest
+        fp = {"runner": "test", "window": "2026-01"}
+        assert build_resume_digest(fp) == build_resume_digest(fp)
+
+    def test_build_resume_digest_length_16(self):
+        from lq.core.resumable import build_resume_digest
+        digest = build_resume_digest({"x": 1})
+        assert len(digest) == 16
+
+    def test_build_resume_digest_differs_on_different_input(self):
+        from lq.core.resumable import build_resume_digest
+        assert build_resume_digest({"a": 1}) != build_resume_digest({"a": 2})
+
+    def test_resolve_default_checkpoint_path_structure(self, tmp_path):
+        from lq.core.resumable import resolve_default_checkpoint_path
+        from lq.core.paths import WorkspaceRoots, DatabasePaths
+        from lq.core.paths import default_settings
+        ws = default_settings()
+        p = resolve_default_checkpoint_path(
+            settings_root=ws,
+            domain="data",
+            runner_name="build_l2",
+            fingerprint={"window": "2026-01"},
+        )
+        assert p.suffix == ".json"
+        assert "data" in str(p)
+        assert "resume" in str(p)
+        assert "build_l2_" in p.name
+
+    def test_parse_optional_date_none(self):
+        from lq.core.resumable import parse_optional_date
+        assert parse_optional_date(None) is None
+        assert parse_optional_date("") is None
+
+    def test_parse_optional_date_iso_string(self):
+        from lq.core.resumable import parse_optional_date
+        result = parse_optional_date("2026-03-31")
+        assert result == date(2026, 3, 31)
+
+    def test_save_resumable_checkpoint_injects_fingerprint(self, tmp_path):
+        from lq.core.checkpoint import JsonCheckpointStore
+        from lq.core.resumable import save_resumable_checkpoint
+        store = JsonCheckpointStore(tmp_path / "cp.json")
+        fp = {"runner": "test", "window": "2026"}
+        result = save_resumable_checkpoint(store, fingerprint=fp, payload={"status": "done"})
+        assert result["fingerprint"] == fp
+        assert result["status"] == "done"
+        loaded = store.load()
+        assert loaded["fingerprint"] == fp
+
+    def test_prepare_resumable_checkpoint_fresh_start(self, tmp_path):
+        from lq.core.resumable import prepare_resumable_checkpoint
+        from lq.core.paths import default_settings
+        ws = default_settings()
+        cp_path = tmp_path / "cp.json"
+        store, state = prepare_resumable_checkpoint(
+            checkpoint_path=cp_path,
+            settings_root=ws,
+            domain="test",
+            runner_name="runner",
+            fingerprint={"x": 1},
+            resume=False,
+            reset_checkpoint=False,
+        )
+        assert state is None
+        assert store.path == cp_path
+
+    def test_prepare_resumable_checkpoint_resume_valid(self, tmp_path):
+        from lq.core.checkpoint import JsonCheckpointStore
+        from lq.core.resumable import prepare_resumable_checkpoint
+        from lq.core.paths import default_settings
+        ws = default_settings()
+        cp_path = tmp_path / "cp.json"
+        fp = {"x": 1}
+        # 先写入一个 running checkpoint
+        JsonCheckpointStore(cp_path).save({"fingerprint": fp, "status": "running", "step": 2})
+        store, state = prepare_resumable_checkpoint(
+            checkpoint_path=cp_path,
+            settings_root=ws,
+            domain="test",
+            runner_name="runner",
+            fingerprint=fp,
+            resume=True,
+            reset_checkpoint=False,
+        )
+        assert state is not None
+        assert state["step"] == 2
+
+    def test_prepare_resumable_checkpoint_fingerprint_mismatch_raises(self, tmp_path):
+        from lq.core.checkpoint import JsonCheckpointStore
+        from lq.core.resumable import prepare_resumable_checkpoint
+        from lq.core.paths import default_settings
+        ws = default_settings()
+        cp_path = tmp_path / "cp.json"
+        JsonCheckpointStore(cp_path).save({"fingerprint": {"x": 1}, "status": "running"})
+        with pytest.raises(ValueError, match="不匹配"):
+            prepare_resumable_checkpoint(
+                checkpoint_path=cp_path,
+                settings_root=ws,
+                domain="test",
+                runner_name="runner",
+                fingerprint={"x": 999},
+                resume=True,
+                reset_checkpoint=False,
+            )
+
+    def test_prepare_resumable_checkpoint_running_without_resume_raises(self, tmp_path):
+        from lq.core.checkpoint import JsonCheckpointStore
+        from lq.core.resumable import prepare_resumable_checkpoint
+        from lq.core.paths import default_settings
+        ws = default_settings()
+        cp_path = tmp_path / "cp.json"
+        fp = {"x": 1}
+        JsonCheckpointStore(cp_path).save({"fingerprint": fp, "status": "running"})
+        with pytest.raises(ValueError, match="未完成"):
+            prepare_resumable_checkpoint(
+                checkpoint_path=cp_path,
+                settings_root=ws,
+                domain="test",
+                runner_name="runner",
+                fingerprint=fp,
+                resume=False,
+                reset_checkpoint=False,
+            )
+
+    def test_prepare_resumable_checkpoint_reset_clears(self, tmp_path):
+        from lq.core.checkpoint import JsonCheckpointStore
+        from lq.core.resumable import prepare_resumable_checkpoint
+        from lq.core.paths import default_settings
+        ws = default_settings()
+        cp_path = tmp_path / "cp.json"
+        fp = {"x": 1}
+        JsonCheckpointStore(cp_path).save({"fingerprint": fp, "status": "running"})
+        store, state = prepare_resumable_checkpoint(
+            checkpoint_path=cp_path,
+            settings_root=ws,
+            domain="test",
+            runner_name="runner",
+            fingerprint=fp,
+            resume=False,
+            reset_checkpoint=True,  # 强制清空
+        )
+        assert state is None
+        assert not cp_path.exists()

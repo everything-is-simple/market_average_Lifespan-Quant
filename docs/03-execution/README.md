@@ -21,6 +21,9 @@
 - 核心模块实现（`src/lq/`：core/data/malf/structure/alpha/filter/position/trade/system）
 - 基础单测覆盖（`tests/unit/`）
 - 首次提交至 GitHub
+- `core` 模块补全：`checkpoint.py`（JsonCheckpointStore）+ `resumable.py`（6 个续跑工具），203 passed（2026-04-02）
+- 全模块 `__init__.py` 填充对齐（core/data/malf/alpha.pas/position，2026-04-02）
+- 核心设计文档同步更新（`docs/01-design/modules/core/`，2026-04-02）
 
 待开卡：
 - `001` — data 获取链接通 baostock（当前 `fetch_daily.py` 为 stub）

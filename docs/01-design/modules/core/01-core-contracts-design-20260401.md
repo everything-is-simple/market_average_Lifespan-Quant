@@ -265,13 +265,20 @@ MARKET_CONTEXT_ENTITY_CODE = "CN_WIDE_INDEX_POOL"
 
 ---
 
-## 8. 已知待修复问题
+## 8. 已知问题
+
+### 8.1 待修复
 
 | 问题 | 描述 | 优先级 |
 |---|---|---|
 | 印花税率不一致 | `core.contracts.STAMP_DUTY_RATE=0.0005` vs `trade` 成本模型 `0.001` | 中（下版本对齐） |
 | 缺少 ID 构造函数 | EQ-gamma 有 `build_signal_id()` 等，本系统 ID 构造散落在各模块 | 低（当前可接受） |
-| 无 checkpoint store | 父系统有 `JsonCheckpointStore`，本系统无 | 低（按需增补） |
+
+### 8.2 已解决
+
+| 问题 | 解决方案 | 解决日期 |
+|---|---|---|
+| 无 checkpoint store | 新增 `checkpoint.py`（JsonCheckpointStore）+ `resumable.py`（6 个续跑工具） | 2026-04-02 |
 
 ---
 

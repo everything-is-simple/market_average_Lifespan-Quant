@@ -21,10 +21,12 @@
 3. `run_output_families.py + table_ownership_manifest.py` 是**治理合同**，当前阶段 Lifespan-Quant 先不引入，等主线跑通后按需增补
 4. 父系统 `core` 只有 4 个 workspace 根（无 `validated_root`），本系统增加第 5 个
 
-**本系统当前实现：**
+**本系统当前实现（v0.1.0）：**
 1. `contracts.py`：4 组枚举（背景层 / PAS 触发层 / 结构位层 / 交易管理层）+ 5 类常量，**已完成**
 2. `paths.py`：WorkspaceRoots（5 根）+ DatabasePaths（5 库）+ `default_settings()` + `tdx_root()` + `tushare_token_path()`，**已完成**
-3. **设计文档缺失**——本次补齐
+3. `calendar.py`：A 股最小交易日历（`is_trading_day` / `next_trading_day`，2024-2027 节假日硬编码），**已完成**
+4. `checkpoint.py`：`JsonCheckpointStore` 长任务 checkpoint 存储，**已完成（2026-04-02）**
+5. `resumable.py`：6 个续跑 helper（`stable_json_dumps / build_resume_digest / resolve_default_checkpoint_path / prepare_resumable_checkpoint / save_resumable_checkpoint / parse_optional_date`），**已完成（2026-04-02）**
 
 ### 1.2 与父系统的主要差异
 
@@ -35,7 +37,7 @@
 | 结构位/filter 枚举 | 无（无此模块） | **有**（StructureLevelType/BreakoutType/AdverseConditionType） |
 | 配置机制 | pydantic 部分，env var 覆盖 | **纯 env var 注入**，无 pydantic |
 | 治理 manifest | run_output_families + table_ownership | 当前不引入，主线跑通后增补 |
-| checkpoint store | JsonCheckpointStore | 当前不引入，按需增补 |
+| checkpoint store | JsonCheckpointStore | **已引入**（`checkpoint.py` + `resumable.py`，2026-04-02）|
 
 ---
 
@@ -43,14 +45,17 @@
 
 `core` 是**全系统合同基础层**，不参与数据流水线，被所有其他模块依赖。
 
-**两个文件，两个职责**：
+**五个文件，四类职责**：
 ```
 core/
-├── contracts.py   — 枚举、类型、常量（所有跨模块共用的语义定义）
-└── paths.py       — 路径合同（工作区根目录 + 数据库路径 + 环境变量解析）
+├── contracts.py    — 枚举、类型、常量（所有跨模块共用的语义定义）
+├── paths.py        — 路径合同（工作区根目录 + 数据库路径 + 环境变量解析）
+├── calendar.py     — A 股最小交易日历（is_trading_day / next_trading_day）
+├── checkpoint.py   — JsonCheckpointStore（长任务 JSON checkpoint 文件管理）
+└── resumable.py    — 续跑工具（digest 计算 / 路径推断 / checkpoint 加载校验）
 ```
 
-`core` 不做任何业务计算，不读写任何数据库，不承载流水线逻辑。它是所有模块对话时共用的"词汇表"。
+`core` 不做任何业务计算，不读写任何数据库，不承载流水线逻辑。它是所有模块对话时共用的"词汇表"与"基础设施工具箱"。
 
 ---
 
@@ -63,6 +68,9 @@ core/
 3. **路径合同**：WorkspaceRoots（5 目录）、DatabasePaths（5 数据库）
 4. **路径解析**：`default_settings()`、`discover_repo_root()`、`tdx_root()`、`tushare_token_path()`
 5. **PAS 治理状态**：`PAS_TRIGGER_STATUS` 字典（冻结当前每个触发器的治理状态）
+6. **交易日历**：`is_trading_day()`、`next_trading_day()`（A 股节假日，2024-2027）
+7. **Checkpoint 存储**：`JsonCheckpointStore`（长任务 JSON checkpoint 文件的 load/save/update/clear）
+8. **续跑工具**：`build_resume_digest()`、`resolve_default_checkpoint_path()`、`prepare_resumable_checkpoint()`、`save_resumable_checkpoint()`、`parse_optional_date()`、`stable_json_dumps()`
 
 ### 3.2 不负责
 
@@ -126,3 +134,4 @@ data / malf / structure / filter / alpha / position / trade / system
 | `00-core-charter-20260401.md`（本文） | 模块章程、血统、边界、铁律 |
 | `01-core-contracts-design-20260401.md` | 4 组枚举 + 5 类常量的设计依据与使用规则 |
 | `02-core-paths-design-20260401.md` | WorkspaceRoots / DatabasePaths / env var 规范 |
+| `03-core-checkpoint-resumable-design-20260402.md` | JsonCheckpointStore + resumable 工具设计与使用规范 |
