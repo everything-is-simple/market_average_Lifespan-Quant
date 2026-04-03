@@ -76,8 +76,9 @@
 ### 2.5 异常截断是真实存在的
 
 - **教训**（卡 243）：`002357.SZ` raw 层完整但 base 层 adjusted 只有 5 行
-- 根因：历史上极端股本变更（10 送 30），gbbq 复权因子在某节点产生断层
+- 根因：历史上极端股本变更（10 送 30），base 构建时因子累乘路径在极端送股比例下溢出中间校验阈值（gbbq 表本身记录完整，问题出在因子累乘路径的数值健壮性）
 - 修复：定向 `factor_path_repair`，不动全库
+- **v0.1 注意**：应加因子累乘路径的数值健壮性校验，而非 gbbq 表完整性校验
 
 ### 2.6 数据新鲜度永远是下游扩样的瓶颈
 
@@ -173,10 +174,10 @@ BEAR_REVERSING  熊市反转中
    - 全库扫描，不限于单个 run_id
    - 兜底把 incremental 层漏掉的 stale/missing 股票补进 downstream scope
 
-**已知残留边界**（卡 242 审查发现）：
-- `freshness_state is None` 时旧实体在 incremental 层不被识别（被 official 层兜住）
-- INDEX 的 `expected_table_count = 2` 缺注释
-- `parameters * 4` 隐式依赖 UNION ALL 段数
+**已知残留边界**（卡 242 审查发现，已全部修复）：
+- `freshness_state is None` 时旧实体在 incremental 层不被识别 → 卡 242 已增加 defensive code 和负面测试覆盖，当前已修复
+- INDEX 的 `expected_table_count = 2` → 卡 242 已补注释
+- `parameters * 4` 隐式依赖 UNION ALL 段数 → 卡 242 已收口
 
 ### 3.7 official daily update 流水线
 
@@ -281,7 +282,7 @@ run_lifespan_official_daily_update
 | T9 | incremental + freshness 双检 | 必须 | planner 必须同时看 source 和 downstream |
 | T10 | DuckDB 写后完整性校验 | 必须 | 大批量写入后全表扫描 |
 | T11 | 双源校验 | 延后 | mootdx 主线 + tushare 审计 |
-| T12 | 治理四件套 | 简化 | v0.1 用增量交付简化版 |
+| T12 | 治理四件套 | 待裁定 | v0.01 四件套已被实战验证有效；v0.1 是否简化需另开设计卡裁定 |
 
 ---
 

@@ -21,6 +21,9 @@
 
 **从父系统继承**：5 目录纪律、5 数据库架构、MALF 三层主轴、PAS 触发器治理、mootdx 数据源
 
+**父系统冻结口径**（`2026-04-03`）：研究验证版主线基本闭环，可持续日更、可复跑、可审计；非正式上线。
+详见：`docs/04-reference/battle-tested-lessons-core-data-malf-from-v001-20260403.md`
+
 **本系统新增**：`structure` 模块（结构位语言）、`filter` 模块（不利条件过滤）、`TradeManager` 5 阶段状态机、`core` 枚举集中化
 
 ---
