@@ -6,7 +6,7 @@
 |---|---|---|
 | 爷爷系统 | `G:\。backups\EmotionQuant-gamma` 的 `gene` 模块 | 思想原型，仅参考 |
 | 父系统 | `G:\MarketLifespan-Quant\docs\01-design\modules\malf\` | 正式定型，完整设计 |
-| 本系统 | `G:\Lifespan-Quant\src\lq\malf\` | 继承父系统冻结合同，新增 `structure` 前置层 |
+| 本系统 | `H:\Lifespan-Quant\src\lq\malf\` | 继承父系统冻结合同，新增 `structure` 前置层 |
 
 本模块直接继承父系统已验证的三层矩阵主轴合同，不重新发明轮子。  
 父系统文档是本模块设计的权威参考。若本文档与父系统冻结文档冲突，以父系统 `13 / 14` 号文档为准。

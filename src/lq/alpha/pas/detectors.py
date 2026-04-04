@@ -5,7 +5,7 @@
     BPB  — excluded/not_for_long_alpha，永久禁止主线，父系统卡 131
     PB   — conditional/conditional_assist_driver，条件格准入，父系统卡 110/121
     TST  — conditional/conditional_assist_driver，条件格准入，父系统卡 126 ✅
-    CPB  — conditional/conditional_assist_driver，条件格准入，父系统卡 129 ✅
+    CPB  — excluded/rejected，三段回测保留段负收益，system 层禁止调用，父系统卡 129/258
 """
 
 from __future__ import annotations

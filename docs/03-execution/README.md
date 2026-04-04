@@ -25,8 +25,10 @@
 - 全模块 `__init__.py` 填充对齐（core/data/malf/alpha.pas/position，2026-04-02）
 - 核心设计文档同步更新（`docs/01-design/modules/core/`，2026-04-02）
 
+已开卡：
+- `001` — **data 全链路 bootstrap**（txt 全量灌入 + 路径修正，2026-04-04）→ `data/card-001-*`
+
 待开卡：
-- `001` — data 获取链接通 baostock（当前 `fetch_daily.py` 为 stub）
 - `002` — malf 三层主轴端到端验证（月线、周线、表面标签）
 - `003` — BOF 在 BULL_MAINSTREAM 格的独立三年验证
 - `004` — structure 模块与 BOF 联合验证（结构位 + BOF 信号）
@@ -34,3 +36,5 @@
 - `006` — TST 独立正式验证卡
 - `007` — CPB 语义收敛 + 独立正式验证卡
 - `008` — 第一 PB 假说独立验证卡（A3）
+- `009` — L2 后复权抽样验证（待 L1 灌入后）
+- `010` — 单测补全：test_adjust_factor.py

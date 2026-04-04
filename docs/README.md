@@ -17,5 +17,5 @@
 ## 不在这里的内容
 
 - 参考资料 → `G:\MarketLifespan-Quant\docs\04-reference\`（父系统参考）
-- 正式数据库 → `G:\Lifespan-data\`
-- 临时产物 → `G:\Lifespan-temp\`
+- 正式七数据库 → `H:\Lifespan-Quant-data\`（全持久化 DuckDB）
+- 临时产物 → `H:\Lifespan-temp\`

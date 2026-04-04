@@ -18,23 +18,27 @@ trigger: always_on
 
 | 目录 | 用途 | 禁止放入 |
 |---|---|---|
-| `G:\Lifespan-Quant` | 代码、文档、脚本、治理 | 数据库、日志、临时文件、缓存 |
-| `G:\Lifespan-data` | 正式数据库与数据产物 | 代码 |
-| `G:\Lifespan-temp` | 临时文件、pytest 产物、中间产物 | 正式代码或文档 |
-| `G:\Lifespan-report` | 报告、图表、正式导出 | 代码 |
-| `G:\Lifespan-Validated` | 跨版本验证资产快照 | 代码 |
+| `H:\Lifespan-Quant` | 代码、文档、脚本、治理 | 数据库、日志、临时文件、缓存 |
+| `H:\Lifespan-Quant-data` | 正式七数据库（全持久化 DuckDB） | 代码 |
+| `H:\Lifespan-temp` | 临时文件、pytest 产物、中间产物 | 正式代码或文档 |
+| `H:\Lifespan-Quant-report` | 报告、图表、正式导出 | 代码 |
+| `H:\Lifespan-Quant-Validated` | 跨版本验证资产快照 | 代码 |
 
 ## 模块依赖矩阵（冻结，禁止反向）
 
 ```
-data   → core
-trade  → core, data
-alpha  → core, data
-malf   → core, data
-system → core, data, trade, alpha, malf
+core（基础层，所有模块依赖）
+data      → core
+malf      → core, data
+structure → core
+filter    → core, malf
+alpha     → core, data, malf, structure, filter
+position  → core, data, alpha
+trade     → core, data, position
+system    → core, data, malf, alpha, position, trade
 ```
 
-禁止把 `alpha`、`malf` 的内部实现直接耦合进 `trade`。
+禁止反向依赖：下游模块不得 import 上游模块的内部实现。
 
 ## 代码规范
 
@@ -64,6 +68,15 @@ system → core, data, trade, alpha, malf
 4. **conclusion**（结论，可被后续任务直接引用）
 
 缺任意一件，不得视为完成。纯文字修正或排障可免。
+
+## 七库全持久化纪律
+
+**核心原则**：历史一旦发生就是永恒的瞬间——绝不重算。磁盘空间换内存，小批量断点续传。
+
+- 七个 DuckDB 全部持久化：raw_market / market_base / malf / structure / filter / research_lab / trade_runtime
+- 每行带 `config_hash`，参数冻结则跳过已有数据；参数变更则 selective rebuild
+- 按日期区间分批处理，checkpoint 标记完成，中断后从断点恢复
+- 禁止把任何库改为内存库或每次重建
 
 ## 禁止行为
 

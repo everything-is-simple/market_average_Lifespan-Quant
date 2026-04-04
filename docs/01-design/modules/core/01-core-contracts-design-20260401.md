@@ -115,11 +115,11 @@
 
 ```python
 PAS_TRIGGER_STATUS = {
-    PasTriggerPattern.BOF: PasTriggerStatus.MAINLINE,
-    PasTriggerPattern.BPB: PasTriggerStatus.REJECTED,    # ← 永久拒绝
-    PasTriggerPattern.PB:  PasTriggerStatus.CONDITIONAL,
-    PasTriggerPattern.TST: PasTriggerStatus.PENDING,
-    PasTriggerPattern.CPB: PasTriggerStatus.PENDING,
+    PasTriggerPattern.BOF: PasTriggerStatus.MAINLINE,      # ← 主策略
+    PasTriggerPattern.TST: PasTriggerStatus.CONDITIONAL,    # ← 辅策略（2020后持续正收益）
+    PasTriggerPattern.PB:  PasTriggerStatus.CONDITIONAL,    # ← 边缘降权（量大质弱）
+    PasTriggerPattern.BPB: PasTriggerStatus.REJECTED,       # ← 永久拒绝
+    PasTriggerPattern.CPB: PasTriggerStatus.REJECTED,       # ← 剔除冻结（保留段负收益）
 }
 ```
 

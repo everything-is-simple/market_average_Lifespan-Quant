@@ -15,6 +15,7 @@ from lq.malf.contracts import (
     MALFBuildManifest,
     build_surface_label,
 )
+from lq.malf.daily import compute_daily_rhythm
 from lq.malf.monthly import classify_monthly_state, compute_monthly_strength
 from lq.malf.weekly import classify_weekly_flow, compute_weekly_strength
 
@@ -59,6 +60,7 @@ def build_malf_context_for_stock(
     signal_date: date,
     monthly_bars: pd.DataFrame,
     weekly_bars: pd.DataFrame,
+    daily_bars: pd.DataFrame | None = None,
 ) -> MalfContext:
     """为单只股票生成当日 MALF 上下文快照。
 
@@ -67,6 +69,8 @@ def build_malf_context_for_stock(
         signal_date  — 信号日期（T 日）
         monthly_bars — 该股票月线 DataFrame（至少含 [month_start, close]）
         weekly_bars  — 该股票周线 DataFrame（至少含 [week_start, close]）
+        daily_bars   — 可选，该股票日线 DataFrame（至少含 [trade_date, close]）；
+                       传入时计算日线节奏（新高日系列），否则使用默认零值
 
     返回：
         MalfContext 不可变对象
@@ -82,6 +86,9 @@ def build_malf_context_for_stock(
     # 派生：表面标签
     surface_label = build_surface_label(monthly_state, weekly_flow)
 
+    # 第三层：日线节奏（可选，需要 L2 日线数据）
+    rhythm = compute_daily_rhythm(daily_bars, signal_date) if daily_bars is not None else {}
+
     return MalfContext(
         code=code,
         signal_date=signal_date,
@@ -90,6 +97,7 @@ def build_malf_context_for_stock(
         surface_label=surface_label,
         monthly_strength=monthly_strength,
         weekly_strength=weekly_strength,
+        **rhythm,
     )
 
 
@@ -98,6 +106,7 @@ def run_malf_batch(
     signal_date: date,
     market_base_path: Path,
     malf_db_path: Path,
+    include_daily_rhythm: bool = False,
 ) -> MALFBuildManifest:
     """批量构建所有股票的 MALF 上下文快照并写入数据库。
 
@@ -106,6 +115,7 @@ def run_malf_batch(
         signal_date     — 信号日期
         market_base_path — market_base 数据库路径
         malf_db_path    — malf 数据库路径
+        include_daily_rhythm — True 时读取 L2 日线数据计算新高日节奏
 
     返回：
         MALFBuildManifest 构建摘要
@@ -138,7 +148,21 @@ def run_malf_batch(
                     [code],
                 ).df()
 
-                ctx = build_malf_context_for_stock(code, signal_date, monthly_df, weekly_df)
+                # 第三层：日线节奏（可选）
+                daily_df = None
+                if include_daily_rhythm:
+                    try:
+                        daily_df = base_conn.execute(
+                            "SELECT trade_date, close "
+                            "FROM stock_daily_adjusted "
+                            "WHERE code = ? AND adjust_method = 'backward' "
+                            "ORDER BY trade_date",
+                            [code],
+                        ).df()
+                    except Exception:
+                        daily_df = None  # 表不存在或查询失败时静默降级
+
+                ctx = build_malf_context_for_stock(code, signal_date, monthly_df, weekly_df, daily_df)
                 rows.append({**ctx.as_dict(), "run_id": None})
 
             except Exception:
@@ -185,6 +209,7 @@ def run_malf_batch_incremental(
     market_base_path: Path,
     malf_db_path: Path,
     skip_existing: bool = True,
+    include_daily_rhythm: bool = False,
 ) -> MALFBuildManifest:
     """增量构建 MALF 上下文快照：只处理尚未计算的 (code, signal_date) 组合。
 
@@ -194,6 +219,7 @@ def run_malf_batch_incremental(
         market_base_path — market_base 数据库路径（只读）
         malf_db_path     — malf 数据库路径（读写）
         skip_existing    — True 时跳过已有快照（幂等），False 时强制覆盖
+        include_daily_rhythm — True 时读取 L2 日线数据计算新高日节奏
 
     返回：
         MALFBuildManifest 构建摘要（以最后一个 signal_date 为 asof_date）
@@ -239,7 +265,21 @@ def run_malf_batch_incremental(
                         [code],
                     ).df()
 
-                    ctx = build_malf_context_for_stock(code, signal_date, monthly_df, weekly_df)
+                    # 第三层：日线节奏（可选）
+                    daily_df = None
+                    if include_daily_rhythm:
+                        try:
+                            daily_df = base_conn.execute(
+                                "SELECT trade_date, close "
+                                "FROM stock_daily_adjusted "
+                                "WHERE code = ? AND adjust_method = 'backward' "
+                                "ORDER BY trade_date",
+                                [code],
+                            ).df()
+                        except Exception:
+                            daily_df = None  # 表不存在或查询失败时静默降级
+
+                    ctx = build_malf_context_for_stock(code, signal_date, monthly_df, weekly_df, daily_df)
                     rows_out.append({**ctx.as_dict(), "run_id": None})
                 except Exception:
                     error_count += 1

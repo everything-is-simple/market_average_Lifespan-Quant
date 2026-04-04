@@ -59,11 +59,11 @@ ADMISSION_TABLE: dict[str, dict[str, bool | None]] = {
         "BEAR_COUNTERTREND": True,
     },
     "CPB": {
-        # 条件格准入，父系统 129 号卡冻结：BULL_PERSISTING+MAINSTREAM / BEAR_PERSISTING+COUNTERTREND
-        "BULL_MAINSTREAM": True,
+        # 剔除冻结（三段回测保留段负收益 -33万），全面拒绝
+        "BULL_MAINSTREAM": False,
         "BULL_COUNTERTREND": False,
         "BEAR_MAINSTREAM": False,
-        "BEAR_COUNTERTREND": True,
+        "BEAR_COUNTERTREND": False,
     },
 }
 
@@ -89,7 +89,7 @@ CELL_GATE_TABLE: dict[str, frozenset[tuple[str, str]]] = {
     "BPB": frozenset(),  # 全面拒绝
     "PB":  _CONDITIONAL_ADMITTED_CELLS,
     "TST": _CONDITIONAL_ADMITTED_CELLS,
-    "CPB": _CONDITIONAL_ADMITTED_CELLS,
+    "CPB": frozenset(),  # 剔除冻结（三段回测保留段负收益）
 }
 
 

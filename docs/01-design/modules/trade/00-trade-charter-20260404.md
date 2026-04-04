@@ -1,13 +1,15 @@
-# trade 模块章程 / 2026-03-31（2026-04-01 增补）
+# trade 模块章程 / 2026-04-04
+
+> 取代 `00-trade-charter-20260331.md`。新增 §1.3 开源选型终裁（2026-04-04），明确拒绝 qlib/backtrader/vectorbt 整体依赖，确认 BacktestEngine 自实现决策。
 
 ## 1. 血统与来源
 
 | 层代 | 系统 | 状态 | 主要吸收点 |
 |---|---|---|---|
-| 爷爷系统 | `G:\。backups\EmotionQuant-gamma\src\broker + backtest` | 思想原型已收口 | Broker/Position/Order/Trade 四层合同、日循环引擎、ID 构造规则、A股成本模型 |
-| 父系统 | `G:\MarketLifespan-Quant\src\mlq\trade\` | 正式定型，22文件 | 多运行摘要合同、broker_boundary Protocol、完整 trade_runtime schema（20+表）、企业行动处理 |
-| 本系统 | `G:\Lifespan-Quant\src\lq\trade\` | 继承演进 | 新增 `TradeManager` 5阶段状态机（相对父系统最大增强）、简化 schema |
-| 开源参考 | backtrader / vectorbt / qlib / easytrader | 设计借鉴 | 见 §1.2 |
+| 爷爷系统 | `EmotionQuant-gamma` `src\broker + backtest` | 思想原型已收口 | Broker/Position/Order/Trade 四层合同、日循环引擎、ID 构造规则、A股成本模型 |
+| 父系统 | `MarketLifespan-Quant` `src\mlq\trade\` | 正式定型，22文件 | 多运行摘要合同、broker_boundary Protocol、完整 trade_runtime schema（20+表）、企业行动处理 |
+| 本系统 | `Lifespan-Quant` `src\lq\trade\` | 继承演进 | 新增 `TradeManager` 5阶段状态机（相对父系统最大增强）、简化 schema |
+| 开源参考 | backtrader / vectorbt / qlib / easytrader | 设计借鉴（不引入包依赖） | 见 §1.2 + §1.3 |
 
 ### 1.1 从各代系统吸收的核心结论
 
@@ -33,13 +35,61 @@
 
 | 项目 | 借鉴点 | 取舍决策 |
 |---|---|---|
-| **backtrader** | Data feed / Strategy / Broker 三层分离原则 | ✅ 采用：data(market_base) → TradeManager(strategy) → Broker(execution) 三层 |
-| **backtrader** | Cerebro 引擎、Analyzer 框架 | ❌ 不采用：过重；用简单 BacktestEngine 替代 |
-| **vectorbt** | 向量化 signal→fill→equity curve | ❌ 不采用：BOF 交易需要个股独立状态跟踪，不适合纯向量化 |
-| **qlib** | Executor 与信号生成解耦 | ✅ 采用：Broker 只执行，信号来自上游 |
-| **qlib** | DataHandler / Factor model | ❌ 不采用：信号来自 PAS detectors，非 ML 因子 |
-| **easytrader** | 标准化券商适配器接口（submit/cancel/query） | ✅ 采用：`TradeBrokerAdapter Protocol`（继承自父系统）为实盘预留 |
-| **backtesting.py** | 简洁的 Strategy 类（buy/sell/position） | ✅ 部分采用：TradeManager 的 `update(bar)` 接口风格与此类似 |
+| **backtrader** | Data feed / Strategy / Broker 三层分离原则 | ✅ 采纳理念：data(market_base) → TradeManager(strategy) → Broker(execution) 三层 |
+| **backtrader** | Cerebro 引擎、Analyzer 框架 | ❌ 不引入：过重、侵入性强；用简单 BacktestEngine 替代 |
+| **backtrader** | `CommInfoBase` 自定义佣金模型 | ✅ 采纳理念：`AShareCostModel` 独立类 |
+| **vectorbt** | 向量化 signal→fill→equity curve | ❌ 不引入：BOF 交易需要个股独立状态跟踪，不适合纯向量化 |
+| **qlib** | Executor 与信号生成解耦 | ✅ 采纳理念：Broker 只执行，信号来自上游 |
+| **qlib** | DataHandler / Factor model / Strategy 层 | ❌ 不引入：ML 因子范式与 PAS trigger 状态机不兼容 |
+| **easytrader** | 标准化券商适配器接口（submit/cancel/query） | ✅ 采纳理念：`TradeBrokerAdapter Protocol`（继承自父系统）为实盘预留 |
+| **backtesting.py** | 简洁的 Strategy 类（buy/sell/position） | ✅ 部分采纳：TradeManager 的 `update(bar)` 接口风格与此类似 |
+
+### 1.3 开源选型终裁（2026-04-04）
+
+> 原则：**设计理念值得借鉴，包依赖不引入**。
+
+#### 为什么不整体依赖 qlib
+
+| 维度 | qlib 假设 | 本系统实际 | 冲突程度 |
+|---|---|---|---|
+| Strategy 范式 | 每日根据 ML 因子分数重新分配组合权重 | 发现 BOF 信号后持续跟踪单股 5 阶段直到退出 | **根本冲突** |
+| 信号来源 | DataHandler → Factor → ML Model → pred_scores | PAS detector → StructureSnapshot → AdverseConditionResult → PasSignal | 完全不同 |
+| 状态管理 | 无状态（每日重新计算） | 有状态（TradeManager 5 阶段跨多日） | **根本冲突** |
+| 依赖量 | 15k+ 行核心代码 + PyTorch/LightGBM 可选 | 本系统 trade 层 ~450 行自实现 | 比例失调 |
+| A 股适配 | 有基础支持，但需要大量适配 | 成本模型、T+1 语义已自行定义 | 改造成本高 |
+
+**结论**：qlib 的 Executor/Signal 解耦思想已吸收进 Broker 设计；但整体引入 qlib 包会强制本系统适应 ML 因子范式，得不偿失。
+
+#### 为什么不整体依赖 backtrader
+
+| 维度 | 说明 |
+|---|---|
+| 维护状态 | 2023 年后停止更新，Python 3.11+ 兼容性未知 |
+| 侵入性 | Cerebro 模式要求整个系统嵌入 backtrader 框架内运行 |
+| 替代成本 | 一旦依赖 Cerebro，将来替换引擎需要重写整个调用层 |
+| 实际需求 | 本系统只需一个 ~200 行的日历循环驱动器，不需要 Cerebro 全家桶 |
+
+**结论**：backtrader 的 Data/Strategy/Broker 三层分离是最佳设计参考，已充分吸收。但不引入 backtrader 包。
+
+#### 为什么不整体依赖 vectorbt
+
+trade 章程 v1 已明确：BOF 交易需要逐股独立状态跟踪，向量化范式不匹配。不讨论。
+
+#### 自实现范围与边界
+
+```
+BacktestEngine  — 日历循环 + 上下游协调            ~200 行
+Broker          — 撮合 + 持仓管理 + A 股成本模型    ~200 行
+SimulatedBrokerAdapter — 纸交易适配器               ~50 行
+─────────────────────────────────────────────────
+总计                                                ~450 行
+```
+
+**后悔成本评估**：模块边界清晰（`PositionPlan → trade → TradeRecord`），合同不变。如将来确需引入外部框架，trade 层可替换底层引擎而不影响上下游。
+
+#### backtesting.py 作为备选
+
+如果自实现 BacktestEngine 遇到困难（撮合逻辑 corner case 太多），可考虑引入 `backtesting.py`（1.8k stars，单文件库，侵入性最小）作为底层。但当前不引入。
 
 ---
 
@@ -166,7 +216,7 @@ class TradeBrokerAdapter(Protocol):
     def sync_account_state(self, state: BrokerAccountState) -> str: ...
 ```
 
-当前实现：`SimulatedBrokerAdapter`（纸交易，100% 成交率，T+1 开盘价）  
+当前实现：`SimulatedBrokerAdapter`（纸交易，100% 成交率，T+1 开盘价）
 未来扩展：`EasyTraderBrokerAdapter`（接 easytrader 实盘）
 
 ---
@@ -176,10 +226,10 @@ class TradeBrokerAdapter(Protocol):
 ### 9.1 负责
 
 1. `TradeManager` 5阶段状态机（已实现）
-2. `Broker` 类：撮合、持仓管理、成本计算、账户状态
-3. `BacktestEngine`：日历循环 + 上下游协调
+2. `Broker` 类：撮合、持仓管理、成本计算、账户状态（自实现）
+3. `BacktestEngine`：日历循环 + 上下游协调（自实现，~200 行）
 4. A股成本模型（commission + stamp_duty + transfer_fee + slippage）
-5. `trade_runtime.duckdb` 写入（L4）
+5. `trade_runtime.duckdb` 写入（L4，8 张核心表）
 6. `BrokerAdapter Protocol`（实盘适配预留）
 
 ### 9.2 不负责
@@ -202,6 +252,9 @@ class TradeBrokerAdapter(Protocol):
 5. **trade_runtime 写权**：`trade` 只写 `trade_runtime.duckdb`（L4），禁止写 `research_lab / market_base`
 6. **Broker 不直接读 PasSignal**：Broker 只消费 `PositionPlan / PositionExitPlan`，不绕过 position 模块
 7. **成本模型不可跳过**：即使回测，也必须扣除完整成本（commission + stamp_duty + transfer_fee + slippage）
+8. **不整体依赖外部回测框架**：BacktestEngine / Broker 自实现，保持架构自主权；设计理念可借鉴，包依赖不引入
+9. **backtrader 为验证 oracle**：列入 `[dev]` 依赖，用于独立对照验证自实现引擎的 PnL/R-multiple 正确性；不进入核心依赖
+10. **trade_runtime 为持久化库**：交易记录一旦产生就是历史事实，按交易增量追加，每行带 `config_hash`
 
 ---
 
@@ -210,8 +263,8 @@ class TradeBrokerAdapter(Protocol):
 1. `TradeManager` 5阶段状态机正确顺序触发，有单元测试覆盖五类退出场景
 2. `Broker` 类实现：T+1 撮合 + A股成本 + 持仓账户状态
 3. `BacktestEngine` 日循环可跑通至少 1 年历史数据
-4. `TradeRecord` 落盘，可按 `trade_id / code / signal_date` 追溯
-5. `trade_runtime.duckdb` 4 张核心表 bootstrap 完成
+4. `TradeRecord` 可按 `trade_id / code / signal_date` 追溯
+5. `trade_runtime.duckdb` 8 张核心表 schema 初始化正确；交易记录按交易增量追加，绝不重算
 6. `BrokerAdapter Protocol` 有 `SimulatedBrokerAdapter` 实现
 
 ---
@@ -220,6 +273,16 @@ class TradeBrokerAdapter(Protocol):
 
 | 文档 | 内容 |
 |---|---|
-| `00-trade-charter-20260331.md`（本文） | 模块章程、血统、架构、铁律 |
-| `01-trade-broker-engine-design-20260401.md` | Broker/Engine 设计：ID 规则、订单生命周期、成本计算、日循环伪代码 |
+| `00-trade-charter-20260404.md`（本文） | 模块章程、血统、开源选型终裁、架构、铁律 |
+| `01-trade-broker-engine-design-20260404.md` | Broker/Engine 设计：ID 规则、订单生命周期、成本计算、日循环伪代码、自实现确认 |
 | `02-trade-runtime-schema-design-20260401.md` | trade_runtime.duckdb 最小 schema、表职责、写权边界 |
+
+---
+
+## 变更记录
+
+| 日期 | 版本 | 变更内容 |
+|---|---|---|
+| 2026-03-31 | v1 | 初版 trade 章程 |
+| 2026-04-01 | v1 增补 | 补充 TradeManager 5阶段状态机、BrokerAdapter Protocol |
+| 2026-04-04 | v2 | 新增 §1.3 开源选型终裁；trade_runtime 恢复持久化（七库全持久化）；backtrader 列入 [dev] 验证 oracle；铁律追加 8/9/10 |

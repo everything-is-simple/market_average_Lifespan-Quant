@@ -1,7 +1,7 @@
 """BaoStock 第二校准源审计探针脚本。
 
 对比本地 gbbq 计算的 adjustment_factor 与 BaoStock adj_factor 的差异，
-结果保存到 G:\\Lifespan-temp 目录，不写入正式数据库。
+结果保存到 H:\\Lifespan-temp 目录，不写入正式数据库。
 
 用法：
     python scripts/data/run_baostock_probe.py --codes 000001.SZ 600519.SH
@@ -50,7 +50,7 @@ def _parse_args() -> argparse.Namespace:
         "--output-dir",
         type=str,
         default=None,
-        help="结果输出目录（默认 G:\\Lifespan-temp\\baostock_probe）",
+        help="结果输出目录（默认 H:\\Lifespan-temp\\baostock_probe）",
     )
     parser.add_argument(
         "--dry-run",

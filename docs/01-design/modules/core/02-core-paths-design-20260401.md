@@ -6,7 +6,7 @@
 
 1. 两层路径合同（WorkspaceRoots + DatabasePaths）的字段与职责
 2. 五目录协作规范与默认命名约定
-3. 五数据库路径规范与分层归属
+3. 七数据库路径规范（全持久化）
 4. 环境变量覆盖机制（完整清单）
 5. 特殊数据源路径（TDX / Tushare）
 6. 与父/爷爷系统的对比与取舍
@@ -31,16 +31,18 @@ class WorkspaceRoots:
 
 **`ensure_directories()` 方法**（已实现）：一键创建所有根目录和数据库父目录，适合在 bootstrap 和 runner 开始时调用。
 
-### 2.2 DatabasePaths — 五数据库路径合同
+### 2.2 DatabasePaths — 七数据库路径合同（全持久化）
 
 ```python
 @dataclass(frozen=True)
 class DatabasePaths:
-    raw_market:   Path   # L1 原始日线 + gbbq（由 data 模块独占写）
-    market_base:  Path   # L2 复权价、均线、量比（由 data 模块独占写）
-    research_lab: Path   # L3 PAS 信号、选中 trace（由 alpha 模块独占写）
-    malf:         Path   # L3 MALF 三层主轴输出（由 malf 模块独占写）
-    trade_runtime:Path   # L4 执行合同、回测结果（由 trade + system 写）
+    raw_market:    Path   # L1 原始日线 + gbbq（由 data 模块独占写）
+    market_base:   Path   # L2 复权价、均线、量比（由 data 模块独占写）
+    malf:          Path   # L3 MALF 三层主轴输出（由 malf 模块独占写）
+    structure:     Path   # L3 结构位快照（由 structure 模块独占写）
+    filter:        Path   # L3 不利条件结果（由 filter 模块独占写）
+    research_lab:  Path   # L3 PAS 信号 + 仓位计划（由 alpha+position 独占写）
+    trade_runtime: Path   # L4 交易记录 + 权益曲线（由 trade+system 写）
 ```
 
 通过 `WorkspaceRoots.databases` 属性计算：
@@ -49,11 +51,13 @@ class DatabasePaths:
 @property
 def databases(self) -> DatabasePaths:
     return DatabasePaths(
-        raw_market    = self.data_root / "raw"      / "raw_market.duckdb",
-        market_base   = self.data_root / "base"     / "market_base.duckdb",
-        research_lab  = self.data_root / "research" / "research_lab.duckdb",
-        malf          = self.data_root / "malf"     / "malf.duckdb",
-        trade_runtime = self.data_root / "trade"    / "trade_runtime.duckdb",
+        raw_market    = self.data_root / "raw"       / "raw_market.duckdb",
+        market_base   = self.data_root / "base"      / "market_base.duckdb",
+        malf          = self.data_root / "malf"      / "malf.duckdb",
+        structure     = self.data_root / "structure" / "structure.duckdb",
+        filter        = self.data_root / "filter"    / "filter.duckdb",
+        research_lab  = self.data_root / "research"  / "research_lab.duckdb",
+        trade_runtime = self.data_root / "trade"     / "trade_runtime.duckdb",
     )
 ```
 
@@ -87,11 +91,11 @@ parent/
 在 Windows 实际环境（本机）：
 
 ```
-G:\Lifespan-Quant\       ← repo_root
-G:\Lifespan-data\        ← data_root
-G:\Lifespan-temp\        ← temp_root
-G:\Lifespan-report\      ← report_root
-G:\Lifespan-Validated\   ← validated_root
+H:\Lifespan-Quant\           ← repo_root
+H:\Lifespan-Quant-data\      ← data_root
+H:\Lifespan-temp\            ← temp_root
+H:\Lifespan-Quant-report\    ← report_root
+H:\Lifespan-Quant-Validated\ ← validated_root
 ```
 
 ---
@@ -113,11 +117,13 @@ G:\Lifespan-Validated\   ← validated_root
 ### 4.2 数据库文件实际路径
 
 ```
-G:\Lifespan-data\raw\raw_market.duckdb
-G:\Lifespan-data\base\market_base.duckdb
-G:\Lifespan-data\research\research_lab.duckdb
-G:\Lifespan-data\malf\malf.duckdb
-G:\Lifespan-data\trade\trade_runtime.duckdb
+H:\Lifespan-Quant-data\raw\raw_market.duckdb
+H:\Lifespan-Quant-data\base\market_base.duckdb
+H:\Lifespan-Quant-data\malf\malf.duckdb
+H:\Lifespan-Quant-data\structure\structure.duckdb
+H:\Lifespan-Quant-data\filter\filter.duckdb
+H:\Lifespan-Quant-data\research\research_lab.duckdb
+H:\Lifespan-Quant-data\trade\trade_runtime.duckdb
 ```
 
 ---
@@ -128,13 +134,13 @@ G:\Lifespan-data\trade\trade_runtime.duckdb
 
 | 环境变量 | 覆盖目标 | 示例值 |
 |---|---|---|
-| LQ_REPO_ROOT | WorkspaceRoots.repo_root | `G:\Lifespan-Quant` |
-| LQ_DATA_ROOT | WorkspaceRoots.data_root | `G:\Lifespan-data` |
-| LQ_TEMP_ROOT | WorkspaceRoots.temp_root | `G:\Lifespan-temp` |
-| LQ_REPORT_ROOT | WorkspaceRoots.report_root | `G:\Lifespan-report` |
-| LQ_VALIDATED_ROOT | WorkspaceRoots.validated_root | `G:\Lifespan-Validated` |
-| TDX_ROOT | 通达信本地目录 | `G:\new-tdx\new-tdx` |
-| TUSHARE_TOKEN_PATH | tushare token 配置文件路径 | `G:\keys\tushare_token.txt` |
+| LQ_REPO_ROOT | WorkspaceRoots.repo_root | `H:\Lifespan-Quant` |
+| LQ_DATA_ROOT | WorkspaceRoots.data_root | `H:\Lifespan-Quant-data` |
+| LQ_TEMP_ROOT | WorkspaceRoots.temp_root | `H:\Lifespan-temp` |
+| LQ_REPORT_ROOT | WorkspaceRoots.report_root | `H:\Lifespan-Quant-report` |
+| LQ_VALIDATED_ROOT | WorkspaceRoots.validated_root | `H:\Lifespan-Quant-Validated` |
+| TDX_ROOT | 通达信本地目录 | `D:\new-tdx\new-tdx` |
+| TUSHARE_TOKEN_PATH | tushare token 配置文件路径 | `H:\keys\tushare_token.txt` |
 
 ### 5.2 解析优先级
 

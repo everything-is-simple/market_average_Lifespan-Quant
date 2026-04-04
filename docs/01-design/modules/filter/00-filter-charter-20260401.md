@@ -86,7 +86,7 @@ data → malf → structure → [ filter ] → alpha/pas → position → trade 
 1. 信号生成（属于 alpha/pas）
 2. 结构位识别（属于 structure）
 3. MALF 计算（属于 malf）
-4. 读写数据库（filter 是纯计算层）
+4. 读写上游数据库（filter 只写自己的 `filter.duckdb`）
 5. 仓位或资金管理层面的风险控制（属于 position/trade）
 
 ---
@@ -131,7 +131,8 @@ from lq.malf.contracts import MalfContext
 
 ## 6. 铁律
 
-1. **filter 无数据库**：纯计算层，禁止引入 duckdb 依赖
+1. **filter 拥有 `filter.duckdb`**：不利条件结果按日按股增量追加，历史一旦计算绝不重算
+2. **增量更新**：只处理新日期，每行带 `config_hash`，参数冻结则跳过已有数据
 2. **每条件独立**：每个 `_check_xxx()` 函数必须独立返回 bool，不允许相互依赖
 3. **任一触发即 False**：`tradeable = (active_conditions == [])` ——OR 关系触发，AND 关系通过
 4. **不判断信号有效性**：filter 只说"状态不对"，不说"没有信号"；`tradeable=False` 不等于市场无机会

@@ -105,14 +105,19 @@ class TradeRecord:
     pb_sequence_number: int | None
 ```
 
-## 3. 五数据库分层规则
+## 3. 七数据库分层规则（全持久化）
 
-| 层级 | 数据库 | 写入方 | 读取方 |
-|------|--------|--------|--------|
-| L1 | `raw_market` | `data` | `data`（自读自写） |
-| L2 | `market_base` | `data` | `malf`、`alpha` |
-| L3 | `research_lab` | `alpha/pas` | `position`、`trade` |
-| L3 | `malf` | `malf` | `structure`、`filter`、`alpha` |
-| L4 | `trade_runtime` | `trade` | `system`、`report` |
+**核心原则**：历史一旦发生就是永恒的瞬间——绝不重算。全部落盘，增量更新，断点续传。
+
+| 层级 | 数据库 | 写入方 | 读取方 | 增量策略 |
+|------|--------|--------|--------|----------|
+| L1 | `raw_market` | `data` | `data`（自读自写） | 按日追加 |
+| L2 | `market_base` | `data` | `malf`、`alpha` | 只算新日期 |
+| L3 | `malf` | `malf` | `filter`、`alpha` | 新月/新周 |
+| L3 | `structure` | `structure` | `filter`、`alpha` | 按日按股追加 |
+| L3 | `filter` | `filter` | `alpha` | 按日按股追加 |
+| L3 | `research_lab` | `alpha/pas`、`position` | `trade` | 按信号追加 |
+| L4 | `trade_runtime` | `trade` | `system`、`report` | 按交易追加 |
 
 依赖规则：L2 只读 L1；L3 只读 L1/L2；L4 只读 L1/L2/L3。禁止反向依赖。
+每行带 `config_hash`，参数冻结则跳过已有数据；参数变更则 selective rebuild 受影响行。

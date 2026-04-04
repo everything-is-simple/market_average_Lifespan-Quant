@@ -78,14 +78,11 @@ BEAR_REVERSING ← BEAR_EXHAUSTING ← BEAR_PERSISTING ← BEAR_FORMING
 - 月线强度计算：`src/lq/malf/monthly.py` → `compute_monthly_strength()`
 - 常量定义：`src/lq/malf/contracts.py`
 
-## 6. 已知实现 Gap（待后续执行卡处理）
+## 6. 已知实现 Gap（已修正）
 
-当前 `monthly.py` 的 `classify_monthly_state()` 函数存在以下不完整之处：
+> **2026-04-04 修正完成**：以下两个 Gap 已在 `monthly.py` 中修复。
 
-1. `BEAR_REVERSING` 状态**未被显式返回**——当熊市反转时，代码目前走到 `BULL_REVERSING`
-   分支，语义上存在混淆，需要在后续专门的月线状态机执行卡中修正。
-2. `BULL_REVERSING` 的触发逻辑当前依赖 `rebound_from_low ≥ 20%` 且 `ma6_direction = False`，
-   这与"牛市明确转折"的语义有偏差（应更接近"从高点显著下跌"而非"从低点反弹"）。
+1. ~~`BEAR_REVERSING` 状态未被显式返回~~——已修正：`ma6_direction = True` + `rebound_from_low < 20%` → `BEAR_REVERSING`。
+2. ~~`BULL_REVERSING` 触发逻辑语义偏差~~——已修正：改为 `ma6_direction = False` + `drawdown_from_high < 0` + `amplitude ≥ 25%`（近期有过显著上涨说明此前确实有牛市行情）→ `BULL_REVERSING`。
 
-上述 gap 不影响 `BOF / PB` 当前主线验证结果，但在正式月线状态机校验卡前，
-`BULL_REVERSING / BEAR_REVERSING` 的读数需谨慎使用。
+修正后八态均可显式返回，不影响 `BOF / PB` 主线验证结果。

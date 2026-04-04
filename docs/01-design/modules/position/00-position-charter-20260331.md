@@ -7,7 +7,7 @@
 | 理论源头 | 《交易圣经》第8章 — 布伦特·奔富 | 冻结吸收 | 9种反马丁格尔 sizing 策略、风险优先原则、评价框架 |
 | 爷爷系统 | `G:\。backups\EmotionQuant-gamma\positioning\` | 思想原型已收口 | sizing/partial-exit 双赛道分离、研究卡序列结构、no MSS/IRS 铁律 |
 | 父系统 | `G:\MarketLifespan-Quant\src\mlq\position\` | 正式定型，完整实现 | 5表 schema、控制基线对、position 状态机、v1 partial-exit 契约 |
-| 本系统 | `G:\Lifespan-Quant\src\lq\position\` | 继承演进 | 继承父系统全部合同，本地化 A 股整手约束与 1R 计算 |
+| 本系统 | `H:\Lifespan-Quant\src\lq\position\` | 继承演进 | 继承父系统全部合同，本地化 A 股整手约束与 1R 计算 |
 
 ### 1.1 从书中冻结吸收的核心原则
 

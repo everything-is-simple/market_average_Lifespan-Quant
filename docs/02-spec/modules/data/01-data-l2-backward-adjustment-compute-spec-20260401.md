@@ -106,16 +106,18 @@ xdxr 缺失时 factor=1.0，不影响非除权股票。
 | 文件 | 状态 | 说明 |
 |---|---|---|
 | `src/lq/data/bootstrap.py` | ✅ 已有（已补 asset_master 等表） | schema |
-| `src/lq/data/compute/adjust.py` | ❌ 待建 | 复权因子计算核心 |
-| `src/lq/data/compute/aggregate.py` | ❌ 待建 | 周/月线聚合 |
-| `src/lq/data/compute/pipeline.py` | ❌ 待建 | L1→L2 完整构建管道 |
-| `scripts/data/build_l2_adjusted.py` | ❌ 待建 | 脚本入口 |
+| `src/lq/data/compute/adjust.py` | ✅ 已建（2026-04-01） | 复权因子计算核心 |
+| `src/lq/data/compute/aggregate.py` | ✅ 已建（2026-04-01） | 周/月线聚合 |
+| `src/lq/data/compute/pipeline.py` | ✅ 已建（2026-04-01） | L1→L2 完整构建管道 |
+| `scripts/data/build_l2_adjusted.py` | ✅ 已建（2026-04-01） | 脚本入口 |
 
 ## 7. 下一步执行卡
 
-本规格已冻结。执行卡另开，内容：
-1. 实现 `compute/adjust.py`（核心 gbbq 复权因子计算）
-2. 实现 `compute/aggregate.py`（周/月聚合）
-3. 实现 `scripts/data/build_l2_adjusted.py`
-4. 按验证阈值抽样验证
-5. 补 `tests/unit/data/test_adjust_factor.py`
+本规格已冻结。代码实现已完成（2026-04-01）。
+
+后续执行卡：
+1. ~~实现 `compute/adjust.py`~~ ✅
+2. ~~实现 `compute/aggregate.py`~~ ✅
+3. ~~实现 `scripts/data/build_l2_adjusted.py`~~ ✅
+4. 按验证阈值抽样验证（待 L1 数据灌入后执行）
+5. 补 `tests/unit/data/test_adjust_factor.py`（待开卡）

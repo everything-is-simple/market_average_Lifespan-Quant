@@ -94,8 +94,8 @@ PAS_TRIGGER_STATUS: dict[PasTriggerPattern, PasTriggerStatus] = {
     PasTriggerPattern.BOF: PasTriggerStatus.MAINLINE,
     PasTriggerPattern.BPB: PasTriggerStatus.REJECTED,
     PasTriggerPattern.PB: PasTriggerStatus.CONDITIONAL,
-    PasTriggerPattern.TST: PasTriggerStatus.PENDING,
-    PasTriggerPattern.CPB: PasTriggerStatus.PENDING,
+    PasTriggerPattern.TST: PasTriggerStatus.CONDITIONAL,  # 辅策略（2020后持续正收益）
+    PasTriggerPattern.CPB: PasTriggerStatus.REJECTED,      # 剔除冻结（保留段负收益）
 }
 
 

@@ -6,12 +6,12 @@
 注意：
   - 首次使用前请先运行 bootstrap_storage.py
   - 需要在本机安装通达信并保持数据更新（软件自动同步）
-  - TDX_ROOT 环境变量指定通达信安装目录（默认 G:\\new-tdx\\new-tdx）
-  - LQ_DATA_ROOT 环境变量指定数据存储目录（默认 G:\\Lifespan-data）
+  - TDX_ROOT 环境变量指定通达信安装目录（默认 H:\\new_tdx64）
+  - LQ_DATA_ROOT 环境变量指定数据存储目录（默认 H:\\Lifespan-Quant-data）
 
 使用方式：
     python scripts/data/fetch_daily.py
-    python scripts/data/fetch_daily.py --tdx-root "G:\\new-tdx\\new-tdx"
+    python scripts/data/fetch_daily.py --tdx-root "H:\\new_tdx64"
     python scripts/data/fetch_daily.py --market sh sz --limit 100
 """
 
@@ -32,7 +32,7 @@ def _parse_args() -> argparse.Namespace:
         "--tdx-root",
         type=str,
         default=None,
-        help="通达信安装根目录（默认读 TDX_ROOT 环境变量，再退用 G:\\new-tdx\\new-tdx）",
+        help="通达信安装根目录（默认读 TDX_ROOT 环境变量，再退用 H:\\new_tdx64）",
     )
     parser.add_argument(
         "--market",

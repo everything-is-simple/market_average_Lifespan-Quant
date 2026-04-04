@@ -127,9 +127,9 @@ fingerprint = {
 **示例**（本机环境）：
 
 ```
-G:\Lifespan-temp\data\resume\build_l2_adjusted_a3f7b2c1d4e5f601.json
-G:\Lifespan-temp\malf\resume\run_malf_batch_9b2c3d4e5f6a7b8c.json
-G:\Lifespan-temp\alpha\resume\run_pas_batch_1a2b3c4d5e6f7890.json
+H:\Lifespan-temp\data\resume\build_l2_adjusted_a3f7b2c1d4e5f601.json
+H:\Lifespan-temp\malf\resume\run_malf_batch_9b2c3d4e5f6a7b8c.json
+H:\Lifespan-temp\alpha\resume\run_pas_batch_1a2b3c4d5e6f7890.json
 ```
 
 - `domain` 对应 runner 所在的业务模块（`data / malf / alpha / position / trade`）

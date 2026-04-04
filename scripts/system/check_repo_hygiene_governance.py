@@ -1,8 +1,8 @@
 """检查仓库污染与五目录混用的最低治理规则。
 
 规则：
-  - 禁止在仓库代码目录（G:\\Lifespan-Quant）内存放数据库文件、日志、临时文件。
-  - 数据产物必须放 G:\\Lifespan-data，临时文件放 G:\\Lifespan-temp，报告放 G:\\Lifespan-report。
+  - 禁止在仓库代码目录（H:\\Lifespan-Quant）内存放数据库文件、日志、临时文件。
+  - 数据产物必须放 H:\\Lifespan-Quant-data，临时文件放 H:\\Lifespan-temp，报告放 H:\\Lifespan-Quant-report。
 """
 
 from __future__ import annotations

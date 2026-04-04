@@ -38,7 +38,7 @@ PAS 准入使用两层递进判断：
 | BPB | False | False | False | False |
 | PB | True | False | False | True |
 | TST | True | False | False | True |
-| CPB | True | False | False | True |
+| CPB | False | False | False | False |
 
 ## 3. 第二层：精确 16 格准入（CELL_GATE_TABLE）
 
@@ -63,7 +63,7 @@ BEAR_FORMING, BEAR_PERSISTING, BEAR_EXHAUSTING, BEAR_REVERSING
 | `BEAR_PERSISTING` | `against_flow` | ✅ |
 | 其他所有态 | 任意 | ❌（sparse，研究可跑但非主力） |
 
-### PB / TST / CPB（conditional）— 对角两格
+### PB / TST（conditional）— 对角两格
 
 | monthly_state | weekly_flow | 准入 |
 |---|---|---|
@@ -71,9 +71,11 @@ BEAR_FORMING, BEAR_PERSISTING, BEAR_EXHAUSTING, BEAR_REVERSING
 | `BEAR_PERSISTING` | `against_flow` | ✅ |
 | 其他所有组合 | — | ❌ |
 
-### BPB — 全拒绝
+### BPB / CPB — 全拒绝
 
 任意 `(monthly_state, weekly_flow)` 组合 → ❌
+
+> CPB 三段回测保留段负收益（-33万），降为 REJECTED（父系统卡 258）。
 
 ## 4. cell_gate_check() 函数规范
 

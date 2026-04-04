@@ -95,7 +95,10 @@ def compute_daily_rhythm(
 当 pipeline 读入 L2 日线数据（`stock_daily_adjusted`）后，
 由 pipeline.py 调用 `compute_daily_rhythm()` 并将结果注入 `MalfContext`。
 
-**当前状态**：日线节奏字段已进入合同，算法已实现，pipeline 集成待 L2 日线数据就绪后另开执行卡。
+**当前状态**：日线节奏字段已进入合同，算法已实现，pipeline 已集成（2026-04-04）。
+`build_malf_context_for_stock()` 接受可选 `daily_bars` 参数；
+`run_malf_batch()` / `run_malf_batch_incremental()` 通过 `include_daily_rhythm=True` 开关读取 `stock_daily_adjusted` 表。
+日线数据不可用时静默降级为默认零值，不影响月线/周线两层输出。
 
 ## 7. 与父系统的关系
 

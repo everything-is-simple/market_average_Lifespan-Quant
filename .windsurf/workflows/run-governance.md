@@ -33,5 +33,5 @@ pre-commit run --all-files
 4. 把扫描结果写入报告文件（输出到 Lifespan-temp）：
 
 ```
-python scripts/system/check_development_governance.py --report-path G:/Lifespan-temp/governance/governance-report-latest.md
+python scripts/system/check_development_governance.py --report-path H:/Lifespan-temp/governance/governance-report-latest.md
 ```

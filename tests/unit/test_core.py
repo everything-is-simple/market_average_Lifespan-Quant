@@ -87,9 +87,11 @@ class TestPasTriggerStatus:
     def test_pb_is_conditional(self):
         assert PAS_TRIGGER_STATUS[PasTriggerPattern.PB] == PasTriggerStatus.CONDITIONAL
 
-    def test_tst_cpb_are_pending(self):
-        assert PAS_TRIGGER_STATUS[PasTriggerPattern.TST] == PasTriggerStatus.PENDING
-        assert PAS_TRIGGER_STATUS[PasTriggerPattern.CPB] == PasTriggerStatus.PENDING
+    def test_tst_is_conditional(self):
+        assert PAS_TRIGGER_STATUS[PasTriggerPattern.TST] == PasTriggerStatus.CONDITIONAL
+
+    def test_cpb_is_rejected(self):
+        assert PAS_TRIGGER_STATUS[PasTriggerPattern.CPB] == PasTriggerStatus.REJECTED
 
 
 class TestPaths:

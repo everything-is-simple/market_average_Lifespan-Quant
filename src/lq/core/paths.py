@@ -15,13 +15,16 @@ from pathlib import Path
 # ---------------------------------------------------------------------------
 # 内部常量：目录名称约定（可被环境变量覆盖）
 # ---------------------------------------------------------------------------
-_DATA_DIRNAME = "Lifespan-data"
+_DATA_DIRNAME = "Lifespan-Quant-data"
 _TEMP_DIRNAME = "Lifespan-temp"
-_REPORT_DIRNAME = "Lifespan-report"
-_VALIDATED_DIRNAME = "Lifespan-Validated"
+_REPORT_DIRNAME = "Lifespan-Quant-report"
+_VALIDATED_DIRNAME = "Lifespan-Quant-Validated"
 
 # 通达信本地目录默认路径（可被 TDX_ROOT 环境变量覆盖）
-_DEFAULT_TDX_ROOT = Path(r"G:\new-tdx\new-tdx")
+_DEFAULT_TDX_ROOT = Path(r"H:\new_tdx64")
+
+# 通达信离线导出数据目录（可被 TDX_OFFLINE_DATA_ROOT 环境变量覆盖）
+_DEFAULT_TDX_OFFLINE_DATA_ROOT = Path(r"H:\tdx_offline_Data")
 
 
 def discover_repo_root(start: Path | None = None) -> Path:
@@ -99,6 +102,11 @@ def tdx_root() -> Path:
     return Path(os.getenv("TDX_ROOT", str(_DEFAULT_TDX_ROOT))).resolve()
 
 
+def tdx_offline_data_root() -> Path:
+    """解析通达信离线导出数据目录。优先读 TDX_OFFLINE_DATA_ROOT 环境变量。"""
+    return Path(os.getenv("TDX_OFFLINE_DATA_ROOT", str(_DEFAULT_TDX_OFFLINE_DATA_ROOT))).resolve()
+
+
 def tushare_token_path() -> Path | None:
     """解析 tushare token 配置文件路径。读 TUSHARE_TOKEN_PATH 环境变量，未设置时返回 None。"""
     raw = os.getenv("TUSHARE_TOKEN_PATH")
@@ -114,8 +122,9 @@ def default_settings(repo_root: Path | None = None) -> WorkspaceRoots:
     - LQ_TEMP_ROOT       覆盖临时目录
     - LQ_REPORT_ROOT     覆盖报告目录
     - LQ_VALIDATED_ROOT  覆盖验证资产目录
-    - TDX_ROOT           通达信本地目录（由 tdx_root() 独立解析）
-    - TUSHARE_TOKEN_PATH tushare token 配置文件路径（由 tushare_token_path() 独立解析）
+    - TDX_ROOT               通达信本地目录（由 tdx_root() 独立解析）
+    - TDX_OFFLINE_DATA_ROOT   通达信离线导出数据目录（由 tdx_offline_data_root() 独立解析）
+    - TUSHARE_TOKEN_PATH      tushare token 配置文件路径（由 tushare_token_path() 独立解析）
     """
     resolved_repo = Path(
         os.getenv("LQ_REPO_ROOT", str(repo_root or discover_repo_root()))

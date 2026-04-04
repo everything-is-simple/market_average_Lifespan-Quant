@@ -30,6 +30,7 @@ class DataSourceType(str, Enum):
 
     TDX_LOCAL_DAY = "tdx_local_day"       # 主线：日线原始价
     TDX_LOCAL_GBBQ = "tdx_local_gbbq"     # 主线：除权除息（复权依据）
+    TDX_OFFLINE_TXT = "tdx_offline_txt"   # 主线：离线导出 txt 全量灌入（含复权价）
     TUSHARE = "tushare"                    # 第一校准：复权因子审计 + 基本面数据
     BAOSTOCK = "baostock"                  # 第二校准：adjust_factor + dividend_data（fallback）
 

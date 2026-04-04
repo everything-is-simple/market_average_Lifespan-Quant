@@ -116,7 +116,9 @@ def classify_monthly_state(
             if speed_slowing:
                 return "BEAR_EXHAUSTING"
             return "BEAR_PERSISTING"
-        elif rebound_from_low >= MONTHLY_LONG_BULL_REVERSAL_PCT:
+        elif drawdown_from_high < 0 and amplitude >= MONTHLY_LONG_BULL_MIN_AMPLITUDE_PCT / 100:
+            # 方向向下 + 从高点有回落 + 近期振幅达标（说明此前确实有过牛市行情）
+            # → 牛市明确转折向下
             return "BULL_REVERSING"
         else:
             return "BEAR_FORMING"

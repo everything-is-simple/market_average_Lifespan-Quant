@@ -2,7 +2,7 @@
 
 ## 1. 设计目标
 
-本文定义 `trade_runtime.duckdb`（L4 层）的最小可运行 schema，包括：
+本文定义 `trade_runtime.duckdb`（L4 层，持久化）的最小可运行 schema，包括：
 
 1. 表职责与分层逻辑
 2. 完整 DDL（CREATE TABLE）
@@ -24,10 +24,9 @@
 
 ### 2.2 写权独占原则
 
-`trade_runtime.duckdb` 是 `trade` 模块独占写入的数据库：
-- `trade` 写入：所有 8 张表
+`trade_runtime.duckdb` 是 `trade` 模块独占写入的持久化数据库：
+- `trade` 写入：所有 8 张表（按交易增量追加，绝不重算）
 - `system` 只读：用于生成报告
-- `report` 只读：用于可视化输出
 - `position / alpha / malf` 禁止写入
 
 ### 2.3 可追溯原则

@@ -3,7 +3,7 @@
 用法：
     python scripts/system/check_development_governance.py
     python scripts/system/check_development_governance.py src/lq/data/bootstrap.py
-    python scripts/system/check_development_governance.py --report-path G:/Lifespan-temp/governance.md
+    python scripts/system/check_development_governance.py --report-path H:/Lifespan-temp/governance.md
 """
 
 from __future__ import annotations

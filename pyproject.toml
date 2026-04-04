@@ -32,7 +32,7 @@ packages = ["src/lq"]
 [tool.pytest.ini_options]
 pythonpath = ["src"]
 testpaths = ["tests"]
-addopts = "--basetemp=G:/Lifespan-temp/lq/pytest/default"
+addopts = "--basetemp=H:/Lifespan-temp/lq/pytest/default"
 
 [tool.ruff]
 line-length = 100

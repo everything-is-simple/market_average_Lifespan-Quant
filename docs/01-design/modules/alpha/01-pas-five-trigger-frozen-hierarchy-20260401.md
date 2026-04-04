@@ -10,7 +10,7 @@
 | `BOF` | `core / primary_trend_driver` | 93 |
 | `PB` | `conditional / conditional_assist_driver` | 110, 121 |
 | `TST` | `conditional / conditional_assist_driver` | 126 |
-| `CPB` | `conditional / conditional_assist_driver` | 129 |
+| `CPB` | `excluded / rejected`（保留段负收益） | 129, 258 |
 | `BPB` | `excluded / not_for_long_alpha` | 93, 131 |
 
 ## 2. BOF — core / primary_trend_driver
@@ -56,18 +56,21 @@
 - 不支持"TST 本身反脆弱"的系统结论（父系统明确不采用）。
 - "TST 在区间表现不错"的假说当前无正式证据，禁止作为系统口径。
 
-## 5. CPB — conditional / conditional_assist_driver
+## 5. CPB — excluded / rejected
 
-**父系统卡 129：CPB 独立 16 格正式验证结论**
+**父系统卡 129 + 258：CPB 独立验证 + 三段回测裁决**
 
-- 验证窗口：短窗口（2026-03-28）+ 三年全窗口（2026-03-29）双重验证
-- 正式准入格：`BULL_PERSISTING__MAINSTREAM`，`BEAR_PERSISTING__COUNTERTREND`
-- 全窗口正式读数比短窗口多确认了 `BEAR_PERSISTING__COUNTERTREND`
+- 父系统卡 129：16 格短窗口/全窗口双重验证，条件格有效但不强
+- 父系统卡 258：877 只股票三段回测（基准线/校验线/保留段）
+  - 基准线 2010-2019：2432 笔，胜率 43.3%，净收益 +3.3万（微正）
+  - 校验线 2020-2022：1056 笔，胜率 43.0%，净收益 +11.7万
+  - 保留段 2023-2026：1565 笔，胜率 42.2%，净收益 **-33.1万**
 
 **正式口径：**
 
-- 从"单一强格候选"升级为"双条件格准入"，以全窗口为准。
-- CPB 当前主线口径为条件格准入，不得外推到其他格或其他退出策略。
+- CPB 三段回测保留段负收益，未证明正期望，降为 REJECTED。
+- `system` 层禁止调用 CPB，与 BPB 同等对待。
+- 代码存留但不参与任何主线 runner。
 
 ## 6. BPB — excluded / not_for_long_alpha
 

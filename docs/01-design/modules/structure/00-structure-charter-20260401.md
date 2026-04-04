@@ -50,7 +50,7 @@ data → malf → [ structure ] → filter → alpha/pas → position → trade 
 
 **`structure` 不做**：
 - 不判断是否入场（属于 `filter` 和 `alpha/pas`）
-- 不持有数据库
+- 输出落入 `structure.duckdb`（L3，按日按股增量追加）
 - 不依赖 MALF 上下文（结构位识别是价格行为本身，不需要背景层）
 
 ---
@@ -69,9 +69,7 @@ data → malf → [ structure ] → filter → alpha/pas → position → trade 
 
 1. 判断可否入场（属于 filter）
 2. PAS 触发器判断（属于 alpha）
-3. 读写数据库（structure 是纯计算层，无 DB 依赖）
-4. 历史结构位的持久化存储（当前每次重新计算，不落库）
-5. 多股聚合分析
+3. 多股聚合分析
 
 ---
 
@@ -106,7 +104,8 @@ from lq.core.contracts import StructureLevelType, BreakoutType  # 只依赖 core
 
 ## 6. 铁律
 
-1. **structure 无数据库**：纯计算层，禁止引入 duckdb 依赖
+1. **structure 拥有 `structure.duckdb`**：结构位快照按日按股增量追加，历史一旦计算绝不重算
+2. **增量更新**：只处理新日期，每行带 `config_hash`，参数冻结则跳过已有数据
 2. **无 MALF 依赖**：结构位识别只看价格行为，不依赖月线/周线背景（背景判断属于 filter）
 3. **结构位合同格式冻结**：`StructureSnapshot` 的字段结构一旦发布不允许缩减（只允许向后兼容添加）
 4. **强度公式固定**：`strength = 0.5 * age_decay + touch_bonus`，不允许在不同调用路径中使用不同公式

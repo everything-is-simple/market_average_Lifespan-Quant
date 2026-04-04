@@ -6,7 +6,7 @@
 |---|---|---|
 | 爷爷系统 | `G:\。backups\EmotionQuant-gamma` 的 `normandy` 模块（PAS 五形态原型） | 思想原型，仅参考 |
 | 父系统 | `G:\MarketLifespan-Quant\docs\01-design\modules\alpha\` | 正式定型，完整设计 |
-| 本系统 | `G:\Lifespan-Quant\src\lq\alpha\` | 继承父系统 PAS 五 trigger，新增 `structure` 前置层与第一 PB 追踪 |
+| 本系统 | `H:\Lifespan-Quant\src\lq\alpha\` | 继承父系统 PAS 五 trigger，新增 `structure` 前置层与第一 PB 追踪 |
 
 ## 2. 模块定位
 
@@ -26,11 +26,12 @@
 | `BOF` | **core / primary_trend_driver** | persisting 四格为主力（non-sparse 集中于 BULL/BEAR_PERSISTING × MAINSTREAM/COUNTERTREND） | 93 |
 | `PB` | **conditional / conditional_assist_driver** | `BULL_PERSISTING + with_flow`，`BEAR_PERSISTING + against_flow` | 110, 121 |
 | `TST` | **conditional / conditional_assist_driver** | `BULL_PERSISTING + with_flow`，`BEAR_PERSISTING + against_flow` | 126 ✅ |
-| `CPB` | **conditional / conditional_assist_driver** | `BULL_PERSISTING + with_flow`，`BEAR_PERSISTING + against_flow` | 129 ✅ |
+| `CPB` | **excluded / rejected**（保留段负收益） | —（三段回测未证明正收益，system 层禁止调用） | 129, 258 |
 | `BPB` | **excluded / not_for_long_alpha** | — | 93, 131 |
 
 **说明：**
-- TST 和 CPB 均已完成父系统三年独立验证，不再是"待验证"。
+- TST 已完成父系统三年独立验证，三段回测确认为辅策略（CONDITIONAL）。
+- CPB 三段回测保留段负收益（-33万），降为 REJECTED，system 层禁止调用。
 - 条件格准入：必须同时满足 `monthly_state ∈ {BULL_PERSISTING, BEAR_PERSISTING}` + 正确 `weekly_flow`，才允许进入主线。
 - BPB 永久禁止进入主线，无论测试结果如何。
 - 价格口径：信号层以 `backward-adjusted` 为准（研究层合同），尚未对齐 raw-execution 口径（父系统 130 号卡边界说明）。

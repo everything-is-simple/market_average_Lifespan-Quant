@@ -8,11 +8,11 @@ gbbq 文件包含 14 种企业行动事件，其中 category=1（除权除息）
 
 注意：
   - 首次使用前请先运行 bootstrap_storage.py
-  - TDX_ROOT 环境变量指定通达信安装目录（默认 G:\\new-tdx\\new-tdx）
+  - TDX_ROOT 环境变量指定通达信安装目录（默认 H:\\new_tdx64）
 
 使用方式：
     python scripts/data/ingest_xdxr.py
-    python scripts/data/ingest_xdxr.py --tdx-root "G:\\new-tdx\\new-tdx"
+    python scripts/data/ingest_xdxr.py --tdx-root "H:\\new_tdx64"
     python scripts/data/ingest_xdxr.py --codes 000001.SZ 600519.SH
 """
 

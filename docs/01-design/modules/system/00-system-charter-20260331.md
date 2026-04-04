@@ -6,7 +6,7 @@
 |---|---|---|---|
 | 爷爷系统 | `G:\。backups\EmotionQuant-gamma\src\run_metadata.py + config.py` | 思想原型，无正式 system 模块 | run_id 格式规范、config_hash、RunDescriptor、start/finish_run 生命周期 |
 | 父系统 | `G:\MarketLifespan-Quant\src\mlq\system\` | 正式定型，4 个 runner + 13 个治理脚本 | runner 编排模式（子模块串联）、三层上线成熟度、四档信任分级、system 无自有数据库原则 |
-| 本系统 | `G:\Lifespan-Quant\src\lq\system\` | 继承演进 | 新增 `structure/filter` 层、3 个 runner（已实现 1 个）、BPB 永久禁止 |
+| 本系统 | `H:\Lifespan-Quant\src\lq\system\` | 继承演进 | 新增 `structure/filter` 层、3 个 runner（已实现 1 个）、BPB 永久禁止 |
 
 ### 1.1 从各代系统吸收的核心结论
 
