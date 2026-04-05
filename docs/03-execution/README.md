@@ -37,12 +37,12 @@
 - `015` — **trade_runtime 持久化 bootstrap**（TradeManager 批量回测 + config_hash + checkpoint）→ `trade/card-015-*`；依赖 014
 
 待开卡（验证层，待 011-015 完成后启动）：
-- `002` — malf 三层主轴端到端验证（月线、周线、表面标签）
-- `003` — BOF 在 BULL_MAINSTREAM 格的独立三年验证
-- `004` — structure 模块与 BOF 联合验证（结构位 + BOF 信号）
-- `005` — filter 不利条件过滤器效果评估
-- `006` — TST 独立正式验证卡
-- `007` — CPB 语义收敛 + 独立正式验证卡
-- `008` — 第一 PB 假说独立验证卡（A3）
-- `009` — L2 后复权抽样验证（待 L1 灌入后）
-- `010` — 单测补全：test_adjust_factor.py
+- `002` — **malf 三层主轴端到端验证**（月线 8 态 / 周线流向 / 16 格标签）→ `malf/card-002-*`；依赖 011
+- `003` — **BOF 在 BULL_MAINSTREAM 格的独立三年验证**（2020-2022 胜率 / R 倍数 / 净收益）→ `alpha/card-003-*`；依赖 015
+- `004` — **structure 与 BOF 联合验证**（结构位区分力 / available_space_pct 阈值）→ `structure/card-004-*`；依赖 015
+- `005` — **filter 不利条件过滤器效果评估**（五类条件触发率 / 三组对比 / 逐类贡献）→ `filter/card-005-*`；依赖 015
+- `006` — **TST 独立正式验证**（年度拆分 / 16 格拆分 / 与 v0.01 对比）→ `alpha/card-006-*`；依赖 015
+- `007` — **CPB 语义收敛 + 独立验证**（与 BOF 重叠度 / 独有信号表现 / REJECTED 确认或升级）→ `alpha/card-007-*`；依赖 015
+- `008` — **第一 PB 假说独立验证**（pb_sequence_number=1 vs ≥2 / 假说判定）→ `alpha/card-008-*`；依赖 015
+- `009` — **L2 后复权抽样验证**（20 只抽样 / 通达信对照 / gbbq 因子链）→ `data/card-009-*`；依赖 001
+- `010` — **单测补全 test_adjust_factor.py**（≥10 用例 / 四类权益事件 / 边界条件）→ `data/card-010-*`；依赖 001
