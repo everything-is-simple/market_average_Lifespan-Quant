@@ -29,8 +29,14 @@
 已开卡：
 - `001` — **data 全链路 bootstrap**（txt 全量灌入 + 路径修正，2026-04-04）→ `data/card-001-*`
 
-待开卡：
-- `011` — **structure + filter 持久化层 bootstrap**（schema 建表、增量写入 runner、config_hash 跳过逻辑）→ 七库缺口优先级最高
+待开卡（持久化主线实施，按依赖顺序）：
+- `011` — **malf 六层流水线持久化 bootstrap**（schema + batch runner + config_hash + checkpoint）→ `malf/card-011-*`；所有下游依赖，优先级 P0
+- `012` — **structure 持久化层 bootstrap**（schema + batch runner + config_hash + checkpoint）→ `structure/card-012-*`；依赖 011
+- `013` — **filter 持久化层 bootstrap**（schema + batch runner + config_hash + checkpoint）→ `filter/card-013-*`；依赖 011 + 012
+- `014` — **research_lab 持久化 bootstrap**（alpha/pas + position；config_hash trigger 参数域 + batch runner）→ `alpha/card-014-*`；依赖 013
+- `015` — **trade_runtime 持久化 bootstrap**（TradeManager 批量回测 + config_hash + checkpoint）→ `trade/card-015-*`；依赖 014
+
+待开卡（验证层，待 011-015 完成后启动）：
 - `002` — malf 三层主轴端到端验证（月线、周线、表面标签）
 - `003` — BOF 在 BULL_MAINSTREAM 格的独立三年验证
 - `004` — structure 模块与 BOF 联合验证（结构位 + BOF 信号）
