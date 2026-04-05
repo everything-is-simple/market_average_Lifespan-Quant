@@ -135,7 +135,31 @@ data → malf → structure → filter → alpha/pas → position → trade → 
 | 回测引擎 | 自实现 | 自实现（参考 backtrader 理念，不引入包依赖） |
 | 包名 | `mlq` | `lq` |
 
-## 5. 铁律
+## 5. 批处理内存控制合同
+
+**背景**：单机 32G 内存，全市场 5000 只股票 × 10 年日线 × 多层特征不可一次性载入内存。
+
+**批处理铁律**：主线每一层 runner 必须遵守 **读→算→写→释放** 循环：
+
+```
+for batch in code_batches:          # 按股票批次或日期批次切分
+    data = load_from_upstream_db()   # 只读当前批次需要的数据
+    result = compute(data)           # 纯计算，结果在内存中短暂存在
+    write_to_own_db(result)          # 落盘到本模块的持久化库
+    del data, result                 # 显式释放，不依赖 GC 时机
+    update_checkpoint()              # 标记断点，支持中断后续跑
+```
+
+**不允许的模式**：
+- 一次性 `SELECT *` 加载全部历史数据到 DataFrame 再处理
+- 跨层传递大型 DataFrame（模块间只传结果合同对象）
+- 在内存中累积多个批次的中间结果再统一写入（峰值内存不可预测）
+
+**`config_hash` 是批处理的跳过门卫**：每次进入批次前，先查本模块库中是否已有 `(code, date, config_hash)` 记录，有则直接跳过该批次内的对应行，不重算。这使得断点续传和参数不变时的全量重跑代价为零。
+
+---
+
+## 6. 铁律
 
 1. 模块间只传**结果合同**（`dataclass` 对象），不传内部中间特征
 2. `structure` 先于 `alpha/pas`，不利条件过滤先于 trigger 探测

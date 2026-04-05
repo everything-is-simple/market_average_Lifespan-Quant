@@ -93,6 +93,8 @@
 | `research_lab` | `data/research/` | alpha+position | PAS 信号 + 仓位计划 | 按信号追加 |
 | `trade_runtime` | `data/trade/` | trade/system | 交易记录 + 权益曲线 | 按交易追加 |
 
+**硬件约束（设计依据）**：单机 AMD 5800H / **32G 内存** / 2×512G SSD。32G 是硬上限，全市场多层计算必须分批落盘（读→算→写→释放）。父系统 v0.01 的 `research_lab`/`trade_runtime` 虽是磁盘文件，但每次回测生成新 `run_id` 不复用旧结果，1000 只×10 年需 **5–7 小时**。v0.1 改为 `config_hash` 增量跳过：同一 `(code, date, config_hash)` 已存在则直接跳过，不重算。详见 `docs/01-design/00-system-overview-20260404.md §6.1`。
+
 ---
 
 ## 模块依赖矩阵

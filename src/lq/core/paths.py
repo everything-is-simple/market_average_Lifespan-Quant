@@ -38,20 +38,24 @@ def discover_repo_root(start: Path | None = None) -> Path:
 
 @dataclass(frozen=True)
 class DatabasePaths:
-    """正式五数据库路径合同。"""
+    """正式七数据库路径合同（全持久化）。"""
 
-    raw_market: Path       # L1 原始日线（mootdx）+ xdxr（gbbq）
-    market_base: Path      # L2 复权价、均线、量比
-    research_lab: Path     # L3 PAS 信号、选中 trace
-    malf: Path             # L3 MALF 三层主轴输出
-    trade_runtime: Path    # L4 执行合同、回测结果
+    raw_market: Path       # L1 原始日线（TDX txt 全量 + .day 增量）+ xdxr（gbbq）
+    market_base: Path      # L2 复权价、周月线聚合、均线、量比
+    malf: Path             # L3 MALF 三层主轴快照（月线/周线/PAS合同）
+    structure: Path        # L3 结构位快照（支撑/阻力/突破），按日按股追加
+    filter: Path           # L3 不利条件检查结果，按日按股追加
+    research_lab: Path     # L3 PAS 信号 + 仓位计划，按信号追加
+    trade_runtime: Path    # L4 交易记录 + 权益曲线，按交易追加
 
     def as_dict(self) -> dict[str, Path]:
         return {
             "raw_market": self.raw_market,
             "market_base": self.market_base,
-            "research_lab": self.research_lab,
             "malf": self.malf,
+            "structure": self.structure,
+            "filter": self.filter,
+            "research_lab": self.research_lab,
             "trade_runtime": self.trade_runtime,
         }
 
@@ -68,12 +72,14 @@ class WorkspaceRoots:
 
     @property
     def databases(self) -> DatabasePaths:
-        """返回正式五数据库路径（不自动创建目录）。"""
+        """返回正式七数据库路径（不自动创建目录）。"""
         return DatabasePaths(
             raw_market=self.data_root / "raw" / "raw_market.duckdb",
             market_base=self.data_root / "base" / "market_base.duckdb",
-            research_lab=self.data_root / "research" / "research_lab.duckdb",
             malf=self.data_root / "malf" / "malf.duckdb",
+            structure=self.data_root / "structure" / "structure.duckdb",
+            filter=self.data_root / "filter" / "filter.duckdb",
+            research_lab=self.data_root / "research" / "research_lab.duckdb",
             trade_runtime=self.data_root / "trade" / "trade_runtime.duckdb",
         )
 

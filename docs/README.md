@@ -14,6 +14,12 @@
 | `02-spec/` | 数据合同、治理状态、接口规格 |
 | `03-execution/` | 执行卡、证据、记录、结论 |
 
+## 关键设计决策快速入口
+
+- **七库全持久化 + 空间换时间**：`01-design/00-system-overview-20260404.md §6.1`（硬件约束 / v0.01 教训 / config_hash 机制）
+- **批处理内存控制合同**：`01-design/01-system-architecture-20260404.md §5`
+- **config_hash 规格 + Runner 内存约定**：`02-spec/01-data-contracts-20260331.md §3.1-3.2`
+
 ## 不在这里的内容
 
 - 参考资料 → `G:\MarketLifespan-Quant\docs\04-reference\`（父系统参考）

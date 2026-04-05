@@ -24,11 +24,13 @@
 - `core` 模块补全：`checkpoint.py`（JsonCheckpointStore）+ `resumable.py`（6 个续跑工具），203 passed（2026-04-02）
 - 全模块 `__init__.py` 填充对齐（core/data/malf/alpha.pas/position，2026-04-02）
 - 核心设计文档同步更新（`docs/01-design/modules/core/`，2026-04-02）
+- **七库全持久化架构审查（2026-04-05）**：确认七库全部必要；修复 `paths.py` 缺失 `structure`/`filter` 两路径；修复 `00-system-overview` 模块职责表矛盾；落盘空间换时间设计决策备忘（§6.1）、批处理内存控制合同（`01-system-architecture` §5）、`config_hash` 机制规格（`02-spec` §3.1/3.2）
 
 已开卡：
 - `001` — **data 全链路 bootstrap**（txt 全量灌入 + 路径修正，2026-04-04）→ `data/card-001-*`
 
 待开卡：
+- `011` — **structure + filter 持久化层 bootstrap**（schema 建表、增量写入 runner、config_hash 跳过逻辑）→ 七库缺口优先级最高
 - `002` — malf 三层主轴端到端验证（月线、周线、表面标签）
 - `003` — BOF 在 BULL_MAINSTREAM 格的独立三年验证
 - `004` — structure 模块与 BOF 联合验证（结构位 + BOF 信号）

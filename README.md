@@ -62,6 +62,8 @@ data → malf → structure → filter → alpha/pas → position → trade → 
 
 **核心原则**：历史一旦发生就是永恒的瞬间——绝不重算。磁盘空间换内存，小批量断点续传。
 
+> **为什么是七库**：单机 32G 内存是硬约束。父系统 v0.01 的 `research_lab`/`trade_runtime` 虽是磁盘文件，但每次回测生成新 `run_id` 不复用旧结果，1000 只×10 年需 5–7 小时。v0.1 通过 `config_hash` 增量跳过彻底解决——同一 `(code, date, config_hash)` 已存在则直接跳过。决策全记录见 `docs/01-design/00-system-overview-20260404.md §6.1`。
+
 | DB | 路径 | Owner | 内容 | 增量策略 |
 |----|------|-------|------|----------|
 | raw_market | data/raw/ | data | TDX 本地 .day + gbbq 除权除息 | 按日追加 |

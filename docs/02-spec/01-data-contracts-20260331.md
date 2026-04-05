@@ -121,3 +121,38 @@ class TradeRecord:
 
 依赖规则：L2 只读 L1；L3 只读 L1/L2；L4 只读 L1/L2/L3。禁止反向依赖。
 每行带 `config_hash`，参数冻结则跳过已有数据；参数变更则 selective rebuild 受影响行。
+
+### 3.1 config_hash 增量跳过机制规格
+
+每个持久化库中的业务行必须携带以下字段：
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| `code` | `VARCHAR` | 股票代码（主键分量） |
+| `signal_date` | `DATE` | 信号日期（主键分量） |
+| `config_hash` | `VARCHAR(16)` | 输入参数 SHA 前 16 位（主键分量） |
+| `created_at` | `TIMESTAMP` | 写入时间戳 |
+
+**跳过逻辑**（在 runner 批次循环入口执行）：
+
+```python
+already_done = query(
+    "SELECT code FROM {table} WHERE code = ? AND signal_date = ? AND config_hash = ?",
+    (code, date, config_hash)
+)
+if already_done:
+    continue  # 直接跳过，不重算
+```
+
+**`config_hash` 的构造**：对影响计算结果的全部输入参数做确定性序列化后取 SHA256 前 16 位。参数变更 = 新 `config_hash` = 新行写入，旧行保留（selective rebuild 模式下可先 DELETE 旧行再写入）。
+
+### 3.2 批处理内存控制约定（硬件约束）
+
+**约束来源**：单机 32G 内存。全市场 5000 只股票 × 10 年日线不可一次性载入内存。
+
+**Runner 内存合同**：
+
+- 按股票批次（推荐 50–200 只/批）或日期区间分批处理
+- 每批 **读→算→写→释放**，不允许跨批累积中间结果
+- 批次完成后必须调用 `checkpoint.save()`，支持中断后续跑
+- 禁止在 runner 函数签名中传入大型 DataFrame；模块间只传合同对象
