@@ -26,23 +26,28 @@
 - 核心设计文档同步更新（`docs/01-design/modules/core/`，2026-04-02）
 - **七库全持久化架构审查（2026-04-05）**：确认七库全部必要；修复 `paths.py` 缺失 `structure`/`filter` 两路径；修复 `00-system-overview` 模块职责表矛盾；落盘空间换时间设计决策备忘（§6.1）、批处理内存控制合同（`01-system-architecture` §5）、`config_hash` 机制规格（`02-spec` §3.1/3.2）
 
+## 卡目录
+
+卡文件平铺于本目录，格式：`{NNN}-{title}-card-{YYYYMMDD}.md`；
+证据落入 `evidence/`，执行记录落入 `records/`，结论与卡同目录。
+
 已开卡：
-- `001` — **data 全链路 bootstrap**（txt 全量灌入 + 路径修正，2026-04-04）→ `data/card-001-*`
+- `001` — **data 全链路 bootstrap**（txt 全量灌入 + 路径修正，2026-04-04）→ `001-data-full-pipeline-bootstrap-card-20260404.md`
 
-待开卡（持久化主线实施，按依赖顺序）：
-- `011` — **malf 六层流水线持久化 bootstrap**（schema + batch runner + config_hash + checkpoint）→ `malf/card-011-*`；所有下游依赖，优先级 P0
-- `012` — **structure 持久化层 bootstrap**（schema + batch runner + config_hash + checkpoint）→ `structure/card-012-*`；依赖 011
-- `013` — **filter 持久化层 bootstrap**（schema + batch runner + config_hash + checkpoint）→ `filter/card-013-*`；依赖 011 + 012
-- `014` — **research_lab 持久化 bootstrap**（alpha/pas + position；config_hash trigger 参数域 + batch runner）→ `alpha/card-014-*`；依赖 013
-- `015` — **trade_runtime 持久化 bootstrap**（TradeManager 批量回测 + config_hash + checkpoint）→ `trade/card-015-*`；依赖 014
+待开卡（持久化主线，按依赖顺序执行）：
+- `002` — **malf 六层流水线持久化 bootstrap**（schema + batch runner + config_hash + checkpoint）→ `002-malf-persistence-bootstrap-card-20260406.md`；P0，所有下游依赖
+- `003` — **structure 持久化层 bootstrap**（schema + batch runner + config_hash + checkpoint）→ `003-structure-persistence-bootstrap-card-20260406.md`；依赖 002
+- `004` — **filter 持久化层 bootstrap**（schema + batch runner + config_hash + checkpoint）→ `004-filter-persistence-bootstrap-card-20260406.md`；依赖 002 + 003
+- `005` — **research_lab 持久化 bootstrap**（alpha/pas + position；config_hash trigger 参数域 + batch runner）→ `005-research-lab-persistence-bootstrap-card-20260406.md`；依赖 004
+- `006` — **trade_runtime 持久化 bootstrap**（TradeManager 批量回测 + config_hash + checkpoint）→ `006-trade-runtime-persistence-bootstrap-card-20260406.md`；依赖 005
 
-待开卡（验证层，待 011-015 完成后启动）：
-- `002` — **malf 三层主轴端到端验证**（月线 8 态 / 周线流向 / 16 格标签）→ `malf/card-002-*`；依赖 011
-- `003` — **BOF 在 BULL_MAINSTREAM 格的独立三年验证**（2020-2022 胜率 / R 倍数 / 净收益）→ `alpha/card-003-*`；依赖 015
-- `004` — **structure 与 BOF 联合验证**（结构位区分力 / available_space_pct 阈值）→ `structure/card-004-*`；依赖 015
-- `005` — **filter 不利条件过滤器效果评估**（五类条件触发率 / 三组对比 / 逐类贡献）→ `filter/card-005-*`；依赖 015
-- `006` — **TST 独立正式验证**（年度拆分 / 16 格拆分 / 与 v0.01 对比）→ `alpha/card-006-*`；依赖 015
-- `007` — **CPB 语义收敛 + 独立验证**（与 BOF 重叠度 / 独有信号表现 / REJECTED 确认或升级）→ `alpha/card-007-*`；依赖 015
-- `008` — **第一 PB 假说独立验证**（pb_sequence_number=1 vs ≥2 / 假说判定）→ `alpha/card-008-*`；依赖 015
-- `009` — **L2 后复权抽样验证**（20 只抽样 / 通达信对照 / gbbq 因子链）→ `data/card-009-*`；依赖 001
-- `010` — **单测补全 test_adjust_factor.py**（≥10 用例 / 四类权益事件 / 边界条件）→ `data/card-010-*`；依赖 001
+待开卡（验证层，待 002-006 完成后启动）：
+- `007` — **malf 三层主轴端到端验证**（月线 8 态 / 周线流向 / 16 格标签）→ `007-malf-end-to-end-validation-card-20260406.md`；依赖 002
+- `008` — **BOF 在 BULL_MAINSTREAM 格的独立三年验证**（2020-2022 胜率 / R 倍数 / 净收益）→ `008-bof-bull-mainstream-three-year-validation-card-20260406.md`；依赖 006
+- `009` — **structure 与 BOF 联合验证**（结构位区分力 / available_space_pct 阈值）→ `009-structure-bof-joint-validation-card-20260406.md`；依赖 006
+- `010` — **filter 不利条件过滤器效果评估**（五类条件触发率 / 三组对比 / 逐类贡献）→ `010-filter-adverse-condition-evaluation-card-20260406.md`；依赖 006
+- `011` — **TST 独立正式验证**（年度拆分 / 16 格拆分 / 与 v0.01 对比）→ `011-tst-independent-validation-card-20260406.md`；依赖 006
+- `012` — **CPB 语义收敛 + 独立验证**（与 BOF 重叠度 / 独有信号表现 / REJECTED 确认或升级）→ `012-cpb-semantic-convergence-validation-card-20260406.md`；依赖 006
+- `013` — **第一 PB 假说独立验证**（pb_sequence_number=1 vs ≥2 / 假说判定）→ `013-first-pb-hypothesis-validation-card-20260406.md`；依赖 006
+- `014` — **L2 后复权抽样验证**（20 只抽样 / 通达信对照 / gbbq 因子链）→ `014-l2-backward-adjust-sampling-validation-card-20260406.md`；依赖 001
+- `015` — **单测补全 test_adjust_factor.py**（≥10 用例 / 四类权益事件 / 边界条件）→ `015-unit-test-adjust-factor-card-20260406.md`；依赖 001
