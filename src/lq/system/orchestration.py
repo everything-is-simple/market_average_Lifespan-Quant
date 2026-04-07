@@ -19,7 +19,7 @@ import pandas as pd
 
 from lq.core.contracts import PasTriggerPattern, PAS_TRIGGER_STATUS, PasTriggerStatus
 from lq.core.paths import WorkspaceRoots, default_settings
-from lq.malf.contracts import MalfContext, build_surface_label
+from lq.malf.contracts import MalfContext, build_malf_context_4
 from lq.malf.pipeline import build_malf_context_for_stock
 from lq.structure.detector import build_structure_snapshot
 from lq.filter.adverse import check_adverse_conditions
@@ -80,7 +80,7 @@ class StockScanTrace:
     signal_date: date
     # MALF 摘要
     monthly_state: str
-    surface_label: str
+    malf_context_4: str
     # 不利条件过滤结果
     tradeable: bool
     adverse_conditions: tuple[str, ...]
@@ -96,7 +96,7 @@ class StockScanTrace:
             "code": self.code,
             "signal_date": self.signal_date.isoformat(),
             "monthly_state": self.monthly_state,
-            "surface_label": self.surface_label,
+            "malf_context_4": self.malf_context_4,
             "tradeable": self.tradeable,
             "adverse_conditions": list(self.adverse_conditions),
             "adverse_notes": self.adverse_notes,
@@ -235,7 +235,7 @@ def run_daily_signal_scan(
                     code=code,
                     signal_date=signal_date,
                     monthly_state=malf_ctx.monthly_state,
-                    surface_label=malf_ctx.surface_label,
+                    malf_context_4=malf_ctx.malf_context_4,
                     tradeable=False,
                     adverse_conditions=adverse_result.active_conditions,
                     adverse_notes=adverse_result.notes,
@@ -256,7 +256,7 @@ def run_daily_signal_scan(
                 code=code,
                 signal_date=signal_date,
                 monthly_state=malf_ctx.monthly_state,
-                surface_label=malf_ctx.surface_label,
+                malf_context_4=malf_ctx.malf_context_4,
                 tradeable=True,
                 adverse_conditions=adverse_result.active_conditions,
                 adverse_notes=adverse_result.notes,
@@ -275,7 +275,7 @@ def run_daily_signal_scan(
                     code=code,
                     signal_date=signal_date,
                     pattern=trace.pattern,
-                    surface_label=malf_ctx.surface_label,
+                    malf_context_4=malf_ctx.malf_context_4,
                     strength=trace.strength,
                     signal_low=float(daily_df["adj_low"].iloc[-1]),
                     entry_ref_price=current_close,

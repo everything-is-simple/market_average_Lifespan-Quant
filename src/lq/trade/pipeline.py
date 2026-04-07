@@ -49,7 +49,7 @@ CREATE TABLE IF NOT EXISTS trade_record (
     entry_date           DATE    NOT NULL,
     exit_date            DATE,
     signal_pattern       VARCHAR NOT NULL,
-    surface_label        VARCHAR,
+    malf_context_4       VARCHAR,
     entry_price          DOUBLE  NOT NULL,
     exit_price           DOUBLE,
     lot_count            INTEGER NOT NULL,
@@ -93,7 +93,7 @@ CREATE TABLE IF NOT EXISTS trade_build_manifest (
 
 _RECORD_COLS = (
     "trade_id", "code", "signal_date", "entry_date", "exit_date",
-    "signal_pattern", "surface_label",
+    "signal_pattern", "malf_context_4",
     "entry_price", "exit_price", "lot_count",
     "initial_stop_price", "first_target_price", "risk_unit",
     "pnl_amount", "pnl_pct", "r_multiple",
@@ -310,7 +310,7 @@ def _load_signals_for_date(
     with duckdb.connect(str(research_lab_path), read_only=True) as conn:
         if codes:
             rows = conn.execute(
-                "SELECT signal_id, code, signal_date, pattern, surface_label, "
+                "SELECT signal_id, code, signal_date, pattern, malf_context_4, "
                 "       strength, signal_low, entry_ref_price, pb_sequence_number "
                 "FROM pas_formal_signal "
                 "WHERE signal_date = ? AND code = ANY(?)",
@@ -318,14 +318,14 @@ def _load_signals_for_date(
             ).fetchall()
         else:
             rows = conn.execute(
-                "SELECT signal_id, code, signal_date, pattern, surface_label, "
+                "SELECT signal_id, code, signal_date, pattern, malf_context_4, "
                 "       strength, signal_low, entry_ref_price, pb_sequence_number "
                 "FROM pas_formal_signal "
                 "WHERE signal_date = ?",
                 [signal_date],
             ).fetchall()
     cols = [
-        "signal_id", "code", "signal_date", "pattern", "surface_label",
+        "signal_id", "code", "signal_date", "pattern", "malf_context_4",
         "strength", "signal_low", "entry_ref_price", "pb_sequence_number",
     ]
     return [dict(zip(cols, r)) for r in rows]
@@ -381,7 +381,7 @@ def _simulate_trades(
                     code=code,
                     signal_date=signal_date,
                     pattern=sig_dict["pattern"],
-                    surface_label=sig_dict.get("surface_label", "UNKNOWN"),
+                    malf_context_4=sig_dict.get("malf_context_4", "UNKNOWN"),
                     strength=sig_dict.get("strength", 0.5),
                     signal_low=sig_dict["signal_low"],
                     entry_ref_price=sig_dict["entry_ref_price"],
@@ -402,7 +402,7 @@ def _simulate_trades(
                     total_lots=plan.lot_count,
                     active_lots=plan.lot_count,
                     signal_pattern=sig_dict["pattern"],
-                    surface_label=sig_dict.get("surface_label", "UNKNOWN"),
+                    malf_context_4=sig_dict.get("malf_context_4", "UNKNOWN"),
                     pb_sequence_number=sig_dict.get("pb_sequence_number"),
                 )
                 mgr = TradeManager(state=state)
@@ -448,7 +448,7 @@ def _record_to_row(rec: TradeRecord) -> dict[str, Any]:
         "entry_date": rec.entry_date,
         "exit_date": rec.exit_date,
         "signal_pattern": rec.signal_pattern,
-        "surface_label": rec.surface_label,
+        "malf_context_4": rec.malf_context_4,
         "entry_price": rec.entry_price,
         "exit_price": rec.exit_price,
         "lot_count": rec.lot_count,

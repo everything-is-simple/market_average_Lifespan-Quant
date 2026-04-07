@@ -1,11 +1,8 @@
-"""MALF 模块数据合同与常量定义。"""
+"""MALF 模块数据合同与常量定义。
 
-# 历史兼容说明：
-# 当前 MalfContext 合同仍以 monthly_state_8 / weekly_flow / surface_label
-# 三层主轴为核心字段。自 016 起，这套三层主轴不再代表 MALF 正确的
-# 生命周期执行合同；后续正式方向应改为消费
-# malf_context_4 + lifecycle 三轴原始排位（amplitude/duration/new_price）。
-# 现有 MalfContext 保留只为兼容既有 run 与 pipeline。
+正式执行主轴：malf_context_4 + 生命周期三轴原始排位 + 四分位辅助。
+monthly_state_8 / weekly_flow 保留为计算层诊断字段。
+"""
 
 from __future__ import annotations
 
@@ -14,7 +11,7 @@ from datetime import date, datetime
 from typing import Any
 from uuid import uuid4
 
-from lq.core.contracts import MonthlyState8, WeeklyFlowRelation, SurfaceLabel, PasTriggerPattern
+from lq.core.contracts import MonthlyState8, WeeklyFlowRelation, MalfContext4, PasTriggerPattern
 
 
 # ---------------------------------------------------------------------------
@@ -23,7 +20,7 @@ from lq.core.contracts import MonthlyState8, WeeklyFlowRelation, SurfaceLabel, P
 
 MONTHLY_STATE_8_VALUES = tuple(s.value for s in MonthlyState8)
 WEEKLY_FLOW_RELATION_VALUES = tuple(r.value for r in WeeklyFlowRelation)
-CANONICAL_SURFACE_LABELS = tuple(s.value for s in SurfaceLabel)
+MALF_CONTEXT_4_VALUES = tuple(s.value for s in MalfContext4)
 PAS_TRIGGER_PATTERNS = tuple(p.value for p in PasTriggerPattern)
 
 # 月线阶段判定阈值（来自 MarketLifespan-Quant 验证数据）
@@ -96,8 +93,8 @@ def normalize_weekly_flow(raw: str) -> str:
     return _WEEKLY_FLOW_ALIAS.get(raw, raw)
 
 
-def build_surface_label(monthly_state: str, weekly_flow: str) -> str:
-    """根据月线状态和周线顺逆返回表面标签。"""
+def build_malf_context_4(monthly_state: str, weekly_flow: str) -> str:
+    """根据月线状态和周线顺逆返回四格上下文。"""
     normalized_monthly = normalize_monthly_state(monthly_state)
     normalized_weekly = normalize_weekly_flow(weekly_flow)
     is_bull = normalized_monthly.startswith("BULL")
@@ -109,6 +106,16 @@ def build_surface_label(monthly_state: str, weekly_flow: str) -> str:
     if not is_bull and is_with:
         return "BEAR_MAINSTREAM"
     return "BEAR_COUNTERTREND"
+
+
+def derive_long_background_2(monthly_state: str) -> str:
+    """从月线八态收敛为执行层长期背景（BULL / BEAR）。"""
+    return "BULL" if normalize_monthly_state(monthly_state).startswith("BULL") else "BEAR"
+
+
+def derive_intermediate_role_2(weekly_flow: str) -> str:
+    """从周线顺逆映射为执行层中期角色（MAINSTREAM / COUNTERTREND）。"""
+    return "MAINSTREAM" if normalize_weekly_flow(weekly_flow) == "with_flow" else "COUNTERTREND"
 
 
 def build_signal_id(
@@ -131,55 +138,66 @@ def _utc_suffix() -> str:
 
 @dataclass(frozen=True)
 class MalfContext:
-    """单只股票单日的 MALF 三层主轴快照。
+    """单只股票单日的 MALF 上下文快照。
 
-    这是模块间传递的核心结果合同，不传内部中间特征。
+    执行层主轴：malf_context_4 + 生命周期三轴原始排位 + 四分位辅助。
+    计算层诊断：monthly_state / weekly_flow / 日线节奏。
     """
 
     code: str
     signal_date: date
 
-    # 第一层：月线八态
-    monthly_state: str   # MonthlyState8 值
+    # ---- 执行层主字段 ----
+    long_background_2: str          # BULL / BEAR（月线收敛）
+    intermediate_role_2: str        # MAINSTREAM / COUNTERTREND（周线映射）
+    malf_context_4: str             # 四格上下文
 
-    # 第二层：周线顺逆
-    weekly_flow: str     # WeeklyFlowRelation 值
+    # ---- 计算层诊断字段 ----
+    monthly_state: str              # MonthlyState8 值（八态诊断）
+    weekly_flow: str                # WeeklyFlowRelation 值（with_flow / against_flow）
 
-    # 派生：表面标签（16 格框架中的格子定位）
-    surface_label: str   # SurfaceLabel 值
+    # 辅助评分
+    monthly_strength: float | None = None
+    weekly_strength: float | None = None
 
-    # 附加评分字段（可选）
-    monthly_strength: float | None = None    # 月线强度 0~1
-    weekly_strength: float | None = None     # 周线强度 0~1
+    # 日线节奏（新高日系列，立花义正思想）
+    is_new_high_today: bool = False
+    new_high_seq: int = 0
+    days_since_last_new_high: int | None = None
+    new_high_count_in_window: int = 0
 
-    # 第三层：日线节奏（新高日系列，立花义正思想）
-    # 需要 L2 日线数据；pipeline 集成前默认为空
-    is_new_high_today: bool = False          # 当日是否为新高日
-    new_high_seq: int = 0                    # window 内第几个新高日（0 = 非新高日）
-    days_since_last_new_high: int | None = None  # 距上一个新高日的交易日间距
-    new_high_count_in_window: int = 0        # window 内新高日总数量
+    # ---- 生命周期三轴原始排位（排位逻辑待实现，当前默认 None） ----
+    amplitude_rank_low: int | None = None
+    amplitude_rank_high: int | None = None
+    amplitude_rank_total: int | None = None
+    duration_rank_low: int | None = None
+    duration_rank_high: int | None = None
+    duration_rank_total: int | None = None
+    new_price_rank_low: int | None = None
+    new_price_rank_high: int | None = None
+    new_price_rank_total: int | None = None
+
+    # ---- 总生命区间（三轴相加） ----
+    lifecycle_rank_low: int | None = None
+    lifecycle_rank_high: int | None = None
+    lifecycle_rank_total: int | None = None
+
+    # ---- 四分位辅助（晚于排位产生） ----
+    amplitude_quartile: str | None = None
+    duration_quartile: str | None = None
+    new_price_quartile: str | None = None
+    lifecycle_quartile: str | None = None
 
     def __post_init__(self) -> None:
-        # 运行期防御：确保枚举值合法
         if self.monthly_state not in MONTHLY_STATE_8_VALUES:
             raise ValueError(f"非法 monthly_state: {self.monthly_state}")
         if self.weekly_flow not in WEEKLY_FLOW_RELATION_VALUES:
             raise ValueError(f"非法 weekly_flow: {self.weekly_flow}")
+        if self.malf_context_4 not in MALF_CONTEXT_4_VALUES:
+            raise ValueError(f"非法 malf_context_4: {self.malf_context_4}")
 
     def as_dict(self) -> dict[str, Any]:
-        return {
-            "code": self.code,
-            "signal_date": self.signal_date.isoformat(),
-            "monthly_state": self.monthly_state,
-            "weekly_flow": self.weekly_flow,
-            "surface_label": self.surface_label,
-            "monthly_strength": self.monthly_strength,
-            "weekly_strength": self.weekly_strength,
-            "is_new_high_today": self.is_new_high_today,
-            "new_high_seq": self.new_high_seq,
-            "days_since_last_new_high": self.days_since_last_new_high,
-            "new_high_count_in_window": self.new_high_count_in_window,
-        }
+        return asdict(self)
 
 
 @dataclass(frozen=True)
@@ -189,7 +207,7 @@ class MalfContextSnapshot:
     run_id: str
     asof_date: date
     stock_count: int
-    surface_counts: dict[str, int]  # surface_label -> count
+    context_counts: dict[str, int]  # malf_context_4 -> count
     status: str
 
     def as_dict(self) -> dict[str, Any]:
@@ -197,7 +215,7 @@ class MalfContextSnapshot:
             "run_id": self.run_id,
             "asof_date": self.asof_date.isoformat(),
             "stock_count": self.stock_count,
-            "surface_counts": self.surface_counts,
+            "context_counts": self.context_counts,
             "status": self.status,
         }
 

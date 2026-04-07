@@ -18,9 +18,9 @@
 
 ```
 第一组：背景层枚举（MALF）
-    MonthlyState8      — 月线八态（MALF 第一层主轴）
-    WeeklyFlowRelation — 周线顺逆关系（MALF 第二层主轴）
-    SurfaceLabel       — 16 格验证框架四标签
+    MonthlyState8      — 月线八态（MALF 计算层诊断状态，执行层收敛为 BULL/BEAR）
+    WeeklyFlowRelation — 周线顺衰关系（MALF 计算层，执行层映射为 MAINSTREAM/COUNTERTREND）
+    MalfContext4       — 四格上下文（MALF 执行层主轴）
 
 第二组：触发层枚举（PAS）
     PasTriggerPattern  — 五触发模式
@@ -66,7 +66,7 @@
 - `is_bear` — 判断是否熊市阶段
 - `is_trending` — 仅 FORMING/PERSISTING 才算趋势主体（EXHAUSTING/REVERSING 不算）
 
-### 3.2 WeeklyFlowRelation — 周线顺逆关系
+### 3.2 WeeklyFlowRelation — 周线顺衰关系
 
 | 值 | 含义 |
 |---|---|
@@ -75,18 +75,18 @@
 
 **注意**：值用小写下划线格式（历史兼容），与其他枚举的全大写风格不同，不允许修改。
 
-### 3.3 SurfaceLabel — 16 格表面标签
+### 3.3 MalfContext4 — 四格上下文
 
-由月线状态 + 周线顺逆组合生成，是 16 格验证框架的核心分类维度。
+由 `long_background_2`（BULL/BEAR）+ `intermediate_role_2`（MAINSTREAM/COUNTERTREND）组合生成，是 MALF 执行层的主分类维度。
 
-| 值 | 月线 | 周线 |
+| 值 | long_background_2 | intermediate_role_2 |
 |---|---|---|
-| BULL_MAINSTREAM | 牛市（任一状态） | WITH_FLOW |
-| BULL_COUNTERTREND | 牛市（任一状态） | AGAINST_FLOW |
-| BEAR_MAINSTREAM | 熊市（任一状态） | WITH_FLOW |
-| BEAR_COUNTERTREND | 熊市（任一状态） | AGAINST_FLOW |
+| BULL_MAINSTREAM | BULL | MAINSTREAM |
+| BULL_COUNTERTREND | BULL | COUNTERTREND |
+| BEAR_MAINSTREAM | BEAR | MAINSTREAM |
+| BEAR_COUNTERTREND | BEAR | COUNTERTREND |
 
-**`from_monthly_weekly()` 方法**（已实现）：根据两个输入自动推导表面标签，是 `MalfContext` 的核心计算入口。
+**`from_monthly_weekly()` 方法**（已实现）：根据月线状态和周线顺衰自动推导四格上下文。
 
 ---
 

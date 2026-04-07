@@ -28,7 +28,7 @@ import pandas as pd
 from lq.core.paths import WorkspaceRoots, default_settings
 from lq.core.resumable import prepare_resumable_checkpoint, save_resumable_checkpoint
 from lq.filter.adverse import check_adverse_conditions, AdverseConditionResult
-from lq.malf.contracts import MalfContext, build_surface_label
+from lq.malf.contracts import MalfContext, build_malf_context_4, derive_long_background_2, derive_intermediate_role_2
 
 logger = logging.getLogger(__name__)
 
@@ -303,7 +303,8 @@ def _load_malf_for_date(
     """批量加载当日所有股票的 MALF 上下文（O(1) 查询/日）。"""
     try:
         df = malf_conn.execute(
-            "SELECT code, monthly_state, weekly_flow, surface_label "
+            "SELECT code, monthly_state, weekly_flow, malf_context_4, "
+            "       long_background_2, intermediate_role_2 "
             "FROM malf_context_snapshot WHERE signal_date = ?",
             [signal_date],
         ).df()
@@ -316,9 +317,11 @@ def _load_malf_for_date(
             result[row["code"]] = MalfContext(
                 code=row["code"],
                 signal_date=signal_date,
+                long_background_2=row["long_background_2"],
+                intermediate_role_2=row["intermediate_role_2"],
+                malf_context_4=row["malf_context_4"],
                 monthly_state=row["monthly_state"],
                 weekly_flow=row["weekly_flow"],
-                surface_label=row["surface_label"],
             )
         except Exception:
             continue

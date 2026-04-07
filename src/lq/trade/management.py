@@ -50,7 +50,7 @@ class TradeManagementState:
     total_lots: int
     active_lots: int              # 当前持仓手数
     signal_pattern: str
-    surface_label: str
+    malf_context_4: str
     pb_sequence_number: int | None
 
     # 动态状态
@@ -278,7 +278,7 @@ class TradeManager:
             entry_date=self.state.entry_date,    # T+1 日：真实入场日（交易日语义）
             exit_date=exit_date,
             signal_pattern=self.state.signal_pattern,
-            surface_label=self.state.surface_label,
+            malf_context_4=self.state.malf_context_4,
             entry_price=self.state.entry_price,
             exit_price=exit_price,
             lot_count=self.state.total_lots,

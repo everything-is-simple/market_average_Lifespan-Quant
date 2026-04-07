@@ -12,7 +12,7 @@ from lq.malf.contracts import (
     MalfContext,
     normalize_monthly_state,
     normalize_weekly_flow,
-    build_surface_label,
+    build_malf_context_4,
     build_signal_id,
     MONTHLY_STATE_8_VALUES,
     WEEKLY_FLOW_RELATION_VALUES,
@@ -63,18 +63,18 @@ class TestNormalize:
         assert normalize_weekly_flow("with_flow") == "with_flow"
 
 
-class TestBuildSurfaceLabel:
+class TestBuildMalfContext4:
     def test_bull_mainstream(self):
-        assert build_surface_label("BULL_PERSISTING", "with_flow") == "BULL_MAINSTREAM"
+        assert build_malf_context_4("BULL_PERSISTING", "with_flow") == "BULL_MAINSTREAM"
 
     def test_bull_countertrend(self):
-        assert build_surface_label("BULL_PERSISTING", "against_flow") == "BULL_COUNTERTREND"
+        assert build_malf_context_4("BULL_PERSISTING", "against_flow") == "BULL_COUNTERTREND"
 
     def test_bear_mainstream(self):
-        assert build_surface_label("BEAR_PERSISTING", "with_flow") == "BEAR_MAINSTREAM"
+        assert build_malf_context_4("BEAR_PERSISTING", "with_flow") == "BEAR_MAINSTREAM"
 
     def test_bear_countertrend(self):
-        assert build_surface_label("BEAR_PERSISTING", "against_flow") == "BEAR_COUNTERTREND"
+        assert build_malf_context_4("BEAR_PERSISTING", "against_flow") == "BEAR_COUNTERTREND"
 
 
 class TestMalfContext:
@@ -82,30 +82,36 @@ class TestMalfContext:
         ctx = MalfContext(
             code="000001.SZ",
             signal_date=date(2024, 6, 1),
+            long_background_2="BULL",
+            intermediate_role_2="MAINSTREAM",
+            malf_context_4="BULL_MAINSTREAM",
             monthly_state="BULL_PERSISTING",
             weekly_flow="with_flow",
-            surface_label="BULL_MAINSTREAM",
         )
         assert ctx.code == "000001.SZ"
-        assert ctx.surface_label == "BULL_MAINSTREAM"
+        assert ctx.malf_context_4 == "BULL_MAINSTREAM"
 
     def test_invalid_monthly_state(self):
         with pytest.raises(ValueError, match="非法 monthly_state"):
             MalfContext(
                 code="000001.SZ",
                 signal_date=date(2024, 6, 1),
+                long_background_2="BULL",
+                intermediate_role_2="MAINSTREAM",
+                malf_context_4="BULL_MAINSTREAM",
                 monthly_state="INVALID_STATE",
                 weekly_flow="with_flow",
-                surface_label="BULL_MAINSTREAM",
             )
 
     def test_as_dict(self):
         ctx = MalfContext(
             code="000001.SZ",
             signal_date=date(2024, 6, 1),
+            long_background_2="BULL",
+            intermediate_role_2="MAINSTREAM",
+            malf_context_4="BULL_MAINSTREAM",
             monthly_state="BULL_PERSISTING",
             weekly_flow="with_flow",
-            surface_label="BULL_MAINSTREAM",
             monthly_strength=0.8,
         )
         d = ctx.as_dict()

@@ -216,11 +216,11 @@ class TestMalfStage:
             f"预期 with_flow，得到 {ctx.weekly_flow}"
         )
 
-    def test_surface_label_is_bull_mainstream(self):
-        """BULL + with_flow 应对应 BULL_MAINSTREAM 表面标签。"""
+    def test_malf_context_4_is_bull_mainstream(self):
+        """BULL + with_flow 应对应 BULL_MAINSTREAM 四格上下文。"""
         ctx = build_malf_context_for_stock(CODE, SIGNAL_DATE, _MONTHLY, _WEEKLY)
-        assert ctx.surface_label == "BULL_MAINSTREAM", (
-            f"预期 BULL_MAINSTREAM，得到 {ctx.surface_label}"
+        assert ctx.malf_context_4 == "BULL_MAINSTREAM", (
+            f"预期 BULL_MAINSTREAM，得到 {ctx.malf_context_4}"
         )
 
 
@@ -273,9 +273,11 @@ class TestFilterStage:
         bear_ctx = MalfContext(
             code=CODE,
             signal_date=SIGNAL_DATE,
+            long_background_2="BEAR",
+            intermediate_role_2="MAINSTREAM",
+            malf_context_4="BEAR_MAINSTREAM",
             monthly_state="BEAR_PERSISTING",
             weekly_flow="with_flow",
-            surface_label="BEAR_MAINSTREAM",
         )
         result = check_adverse_conditions(CODE, SIGNAL_DATE, _DAILY, malf_ctx=bear_ctx)
         assert not result.tradeable, "BEAR_PERSISTING 背景下应禁止入场"
@@ -334,7 +336,7 @@ def _build_pas_signal(trace: PasDetectTrace, malf_ctx: MalfContext) -> PasSignal
         code=CODE,
         signal_date=SIGNAL_DATE,
         pattern=trace.pattern,
-        surface_label=malf_ctx.surface_label,
+        malf_context_4=malf_ctx.malf_context_4,
         strength=trace.strength,
         signal_low=float(_DAILY["adj_low"].iloc[-1]),          # 信号日最低价
         entry_ref_price=float(_DAILY["adj_close"].iloc[-1]),   # 信号日收盘价
@@ -413,7 +415,7 @@ class TestExplainChainAssembly:
             code=CODE,
             signal_date=SIGNAL_DATE,
             monthly_state=self.ctx.monthly_state,
-            surface_label=self.ctx.surface_label,
+            malf_context_4=self.ctx.malf_context_4,
             tradeable=adverse.tradeable,
             adverse_conditions=adverse.active_conditions,
             adverse_notes=adverse.notes,
@@ -432,9 +434,9 @@ class TestExplainChainAssembly:
         assert self.trace_dict["signal_date"] == SIGNAL_DATE.isoformat()
 
     def test_malf_state_in_explain_chain(self):
-        """解释链应携带 monthly_state 和 surface_label（MALF 摘要）。"""
+        """解释链应携带 monthly_state 和 malf_context_4（MALF 摘要）。"""
         assert self.trace_dict["monthly_state"].startswith("BULL")
-        assert self.trace_dict["surface_label"] == "BULL_MAINSTREAM"
+        assert self.trace_dict["malf_context_4"] == "BULL_MAINSTREAM"
 
     def test_tradeable_true_with_designed_data(self):
         """牛市精设 fixture 下，解释链中 tradeable 应为 True。"""
@@ -457,9 +459,11 @@ class TestExplainChainAssembly:
         bear_ctx = MalfContext(
             code=CODE,
             signal_date=SIGNAL_DATE,
+            long_background_2="BEAR",
+            intermediate_role_2="MAINSTREAM",
+            malf_context_4="BEAR_MAINSTREAM",
             monthly_state="BEAR_PERSISTING",
             weekly_flow="with_flow",
-            surface_label="BEAR_MAINSTREAM",
         )
         adverse = check_adverse_conditions(CODE, SIGNAL_DATE, _DAILY, malf_ctx=bear_ctx)
         blocked = self.StockScanTrace(
@@ -467,7 +471,7 @@ class TestExplainChainAssembly:
             code=CODE,
             signal_date=SIGNAL_DATE,
             monthly_state=bear_ctx.monthly_state,
-            surface_label=bear_ctx.surface_label,
+            malf_context_4=bear_ctx.malf_context_4,
             tradeable=adverse.tradeable,
             adverse_conditions=adverse.active_conditions,
             adverse_notes=adverse.notes,
@@ -501,7 +505,7 @@ class TestExplainChainStructureSummary:
             code=CODE,
             signal_date=SIGNAL_DATE,
             monthly_state=ctx.monthly_state,
-            surface_label=ctx.surface_label,
+            malf_context_4=ctx.malf_context_4,
             tradeable=adverse.tradeable,
             adverse_conditions=adverse.active_conditions,
             adverse_notes=adverse.notes,
@@ -545,9 +549,11 @@ class TestExplainChainStructureSummary:
         bear_ctx = MalfContext(
             code=CODE,
             signal_date=SIGNAL_DATE,
+            long_background_2="BEAR",
+            intermediate_role_2="MAINSTREAM",
+            malf_context_4="BEAR_MAINSTREAM",
             monthly_state="BEAR_PERSISTING",
             weekly_flow="with_flow",
-            surface_label="BEAR_MAINSTREAM",
         )
         adverse = check_adverse_conditions(CODE, SIGNAL_DATE, _DAILY, malf_ctx=bear_ctx)
         blocked = self.StockScanTrace(
@@ -555,7 +561,7 @@ class TestExplainChainStructureSummary:
             code=CODE,
             signal_date=SIGNAL_DATE,
             monthly_state=bear_ctx.monthly_state,
-            surface_label=bear_ctx.surface_label,
+            malf_context_4=bear_ctx.malf_context_4,
             tradeable=adverse.tradeable,
             adverse_conditions=adverse.active_conditions,
             adverse_notes=adverse.notes,

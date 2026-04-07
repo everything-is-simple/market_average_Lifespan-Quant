@@ -7,7 +7,7 @@ from datetime import date, datetime
 from typing import Any
 from uuid import uuid4
 
-from lq.core.contracts import PasTriggerPattern, SurfaceLabel
+from lq.core.contracts import PasTriggerPattern, MalfContext4
 from lq.malf.contracts import build_signal_id, PAS_CONTRACT_VERSION
 
 
@@ -52,7 +52,7 @@ class PasSignal:
     code: str
     signal_date: date
     pattern: str           # PasTriggerPattern 值
-    surface_label: str     # SurfaceLabel 值（来自 MALF 上下文）
+    malf_context_4: str     # MalfContext4 值（来自 MALF 上下文）
     strength: float        # 信号强度 0~1
     signal_low: float      # 信号最低价（用于计算 1R）
     entry_ref_price: float  # 参考入场价（通常是收盘价或次日开盘预估）
@@ -65,7 +65,7 @@ class PasSignal:
             "code": self.code,
             "signal_date": self.signal_date.isoformat(),
             "pattern": self.pattern,
-            "surface_label": self.surface_label,
+            "malf_context_4": self.malf_context_4,
             "strength": self.strength,
             "signal_low": self.signal_low,
             "entry_ref_price": self.entry_ref_price,

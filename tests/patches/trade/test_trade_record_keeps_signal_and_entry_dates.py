@@ -29,7 +29,7 @@ def _make_manager_with_friday_signal() -> TradeManager:
         total_lots=10,
         active_lots=10,
         signal_pattern="BOF",
-        surface_label="BULL_MAINSTREAM",
+        malf_context_4="BULL_MAINSTREAM",
         pb_sequence_number=None,
     )
     mgr = TradeManager(state=state)

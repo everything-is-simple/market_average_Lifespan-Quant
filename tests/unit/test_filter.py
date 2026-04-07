@@ -76,12 +76,15 @@ def _make_chaotic_df(n: int = 20) -> pd.DataFrame:
 
 
 def _make_malf_ctx(monthly_state: str, weekly_flow: str = "with_flow") -> MalfContext:
+    from lq.malf.contracts import build_malf_context_4, derive_long_background_2, derive_intermediate_role_2
     return MalfContext(
         code="000001.SZ",
         signal_date=date(2024, 6, 1),
+        long_background_2=derive_long_background_2(monthly_state),
+        intermediate_role_2=derive_intermediate_role_2(weekly_flow),
+        malf_context_4=build_malf_context_4(monthly_state, weekly_flow),
         monthly_state=monthly_state,
         weekly_flow=weekly_flow,
-        surface_label="BULL_MAINSTREAM",
     )
 
 

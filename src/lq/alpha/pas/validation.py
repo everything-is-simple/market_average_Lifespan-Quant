@@ -1,8 +1,8 @@
-"""16 格正式验证框架 — PAS 信号在不同市场背景下的统计分析。
+"""PAS 四格上下文准入与统计框架 — PAS 信号在不同 malf_context_4 下的统计分析。
 
-16 格 = 4 个表面标签 × BOF/BPB/PB/TST/CPB 组合。
-正式框架中只保留 4 个表面标签：
+四格上下文：
     BULL_MAINSTREAM / BULL_COUNTERTREND / BEAR_MAINSTREAM / BEAR_COUNTERTREND
+精确 cell gate：monthly_state_8 × weekly_flow 组合。
 """
 
 from __future__ import annotations
@@ -11,8 +11,8 @@ from dataclasses import dataclass, field, asdict
 from typing import Any
 
 
-# 四个合法表面标签
-SURFACE_LABELS = (
+# 四格上下文合法值
+MALF_CONTEXT_4_LABELS = (
     "BULL_MAINSTREAM",
     "BULL_COUNTERTREND",
     "BEAR_MAINSTREAM",
@@ -23,9 +23,9 @@ SURFACE_LABELS = (
 TRIGGER_PATTERNS = ("BOF", "BPB", "PB", "TST", "CPB")
 
 # 当前治理裁决（True = 主线准入，False = 拒绝，None = 尚无充分证据）
-# 注意：surface_label 只有 4 层。对于条件格 trigger（PB/TST/CPB），
-# 表面标签准入 + monthly_state 过滤共同构成完整准入判断。
-# 请使用 cell_gate_check() 进行精确 16 格判断。
+# 注意：malf_context_4 只有 4 层。对于条件格 trigger（PB/TST/CPB），
+# 四格准入 + monthly_state 过滤共同构成完整准入判断。
+# 请使用 cell_gate_check() 进行精确 cell gate 判断。
 #
 # 父系统冻结来源：93（BOF）/ 110,121（PB）/ 126（TST）/ 129（CPB）/ 131（BPB）
 ADMISSION_TABLE: dict[str, dict[str, bool | None]] = {
@@ -45,7 +45,7 @@ ADMISSION_TABLE: dict[str, dict[str, bool | None]] = {
     },
     "PB": {
         # 条件格准入：BULL_PERSISTING+with_flow / BEAR_PERSISTING+against_flow
-        # surface_label 层面 True 为必要条件，还需结合 monthly_state 过滤（见 cell_gate_check）
+        # malf_context_4 层面 True 为必要条件，还需结合 monthly_state 过滤（见 cell_gate_check）
         "BULL_MAINSTREAM": True,
         "BULL_COUNTERTREND": False,
         "BEAR_MAINSTREAM": False,
@@ -68,7 +68,7 @@ ADMISSION_TABLE: dict[str, dict[str, bool | None]] = {
 }
 
 # ---------------------------------------------------------------------------
-# 精确 16 格准入表（monthly_state_8 × weekly_flow × pattern）
+# 精确 cell gate 准入表（monthly_state_8 × weekly_flow × pattern）
 # 每个元素 = (monthly_state, weekly_flow) -> 允许模式集
 # ---------------------------------------------------------------------------
 
@@ -94,12 +94,12 @@ CELL_GATE_TABLE: dict[str, frozenset[tuple[str, str]]] = {
 
 
 def cell_gate_check(pattern: str, monthly_state: str, weekly_flow: str) -> bool:
-    """16 格精确准入判断（父系统冻结结论）。
+    """精确 cell gate 准入判断（父系统冻结结论）。
 
     参数：
-        pattern       — PasTriggerPattern 字符串屖
+        pattern       — PasTriggerPattern 字符串
         monthly_state — MonthlyState8 值（来自 MalfContext.monthly_state）
-        weekly_flow   — WeeklyFlowRelation 屖（来自 MalfContext.weekly_flow）
+        weekly_flow   — WeeklyFlowRelation 值（来自 MalfContext.weekly_flow）
 
     返回：True = 允许进入主线 trigger 探测
     """
@@ -111,10 +111,10 @@ def cell_gate_check(pattern: str, monthly_state: str, weekly_flow: str) -> bool:
 
 @dataclass
 class CellStats:
-    """单个格子（pattern × surface_label）的统计数据。"""
+    """单个格子（pattern × malf_context_4）的统计数据。"""
 
     pattern: str
-    surface_label: str
+    malf_context_4: str
     signal_count: int = 0
     win_count: int = 0
     loss_count: int = 0
@@ -132,7 +132,7 @@ class CellStats:
     def as_dict(self) -> dict[str, Any]:
         return {
             "pattern": self.pattern,
-            "surface_label": self.surface_label,
+            "malf_context_4": self.malf_context_4,
             "signal_count": self.signal_count,
             "win_count": self.win_count,
             "loss_count": self.loss_count,
@@ -144,63 +144,62 @@ class CellStats:
 
 
 @dataclass
-class SixteenCellMatrix:
-    """16 格验证矩阵 — PAS 信号系统级 readout。"""
+class ContextAdmissionMatrix:
+    """四格上下文准入矩阵 — PAS 信号系统级 readout。"""
 
     cells: dict[str, dict[str, CellStats]] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
-        # 初始化所有格子（pattern × surface_label）
         for pattern in TRIGGER_PATTERNS:
             self.cells[pattern] = {}
-            for label in SURFACE_LABELS:
+            for label in MALF_CONTEXT_4_LABELS:
                 self.cells[pattern][label] = CellStats(
                     pattern=pattern,
-                    surface_label=label,
+                    malf_context_4=label,
                     admission=ADMISSION_TABLE.get(pattern, {}).get(label),
                 )
 
-    def get_cell(self, pattern: str, surface_label: str) -> CellStats | None:
-        return self.cells.get(pattern, {}).get(surface_label)
+    def get_cell(self, pattern: str, malf_context_4: str) -> CellStats | None:
+        return self.cells.get(pattern, {}).get(malf_context_4)
 
-    def is_admitted(self, pattern: str, surface_label: str) -> bool:
-        cell = self.get_cell(pattern, surface_label)
+    def is_admitted(self, pattern: str, malf_context_4: str) -> bool:
+        cell = self.get_cell(pattern, malf_context_4)
         return cell is not None and cell.admission is True
 
     def summary_table(self) -> list[dict[str, Any]]:
         """返回所有格子的摘要列表。"""
         rows = []
         for pattern in TRIGGER_PATTERNS:
-            for label in SURFACE_LABELS:
+            for label in MALF_CONTEXT_4_LABELS:
                 cell = self.cells[pattern][label]
                 rows.append(cell.as_dict())
         return rows
 
-    def admitted_patterns_for_surface(self, surface_label: str) -> list[str]:
-        """返回指定表面标签下所有准入的 pattern。"""
+    def admitted_patterns_for_context(self, malf_context_4: str) -> list[str]:
+        """返回指定四格上下文下所有准入的 pattern。"""
         return [
             pattern
             for pattern in TRIGGER_PATTERNS
-            if self.is_admitted(pattern, surface_label)
+            if self.is_admitted(pattern, malf_context_4)
         ]
 
 
-def build_16cell_matrix(
+def build_context_admission_matrix(
     signal_records: list[dict[str, Any]],
-) -> SixteenCellMatrix:
-    """根据历史信号记录构建 16 格验证矩阵。
+) -> ContextAdmissionMatrix:
+    """根据历史信号记录构建四格上下文准入矩阵。
 
     参数：
-        signal_records — 每条记录需含 {pattern, surface_label, pnl_pct, r_multiple, is_win}
+        signal_records — 每条记录需含 {pattern, malf_context_4, pnl_pct, r_multiple, is_win}
 
     返回：
-        SixteenCellMatrix 对象（已填充统计数据）
+        ContextAdmissionMatrix 对象（已填充统计数据）
     """
-    matrix = SixteenCellMatrix()
+    matrix = ContextAdmissionMatrix()
 
     for record in signal_records:
         pattern = record.get("pattern", "")
-        label = record.get("surface_label", "")
+        label = record.get("malf_context_4", "")
         cell = matrix.get_cell(pattern, label)
         if cell is None:
             continue

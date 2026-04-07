@@ -27,7 +27,9 @@ from lq.core.resumable import prepare_resumable_checkpoint, save_resumable_check
 from lq.malf.contracts import (
     MalfContext,
     MALFBuildManifest,
-    build_surface_label,
+    build_malf_context_4,
+    derive_long_background_2,
+    derive_intermediate_role_2,
 )
 from lq.malf.daily import compute_daily_rhythm
 from lq.malf.monthly import classify_monthly_state, compute_monthly_strength
@@ -45,15 +47,40 @@ MALF_SCHEMA_SQL = """
 CREATE TABLE IF NOT EXISTS malf_context_snapshot (
     code                     VARCHAR NOT NULL,
     signal_date              DATE    NOT NULL,
+    -- 执行层主字段
+    long_background_2        VARCHAR NOT NULL,
+    intermediate_role_2      VARCHAR NOT NULL,
+    malf_context_4           VARCHAR NOT NULL,
+    -- 计算层诊断
     monthly_state            VARCHAR NOT NULL,
     weekly_flow              VARCHAR NOT NULL,
-    surface_label            VARCHAR NOT NULL,
     monthly_strength         DOUBLE,
     weekly_strength          DOUBLE,
+    -- 日线节奏
     is_new_high_today        BOOLEAN DEFAULT FALSE,
     new_high_seq             INTEGER DEFAULT 0,
     days_since_last_new_high INTEGER,
     new_high_count_in_window INTEGER DEFAULT 0,
+    -- 生命周期三轴原始排位（排位逻辑待实现）
+    amplitude_rank_low       INTEGER,
+    amplitude_rank_high      INTEGER,
+    amplitude_rank_total     INTEGER,
+    duration_rank_low        INTEGER,
+    duration_rank_high       INTEGER,
+    duration_rank_total      INTEGER,
+    new_price_rank_low       INTEGER,
+    new_price_rank_high      INTEGER,
+    new_price_rank_total     INTEGER,
+    -- 总生命区间
+    lifecycle_rank_low       INTEGER,
+    lifecycle_rank_high      INTEGER,
+    lifecycle_rank_total     INTEGER,
+    -- 四分位辅助
+    amplitude_quartile       VARCHAR,
+    duration_quartile        VARCHAR,
+    new_price_quartile       VARCHAR,
+    lifecycle_quartile       VARCHAR,
+    -- 元数据
     run_id                   VARCHAR,
     created_at               TIMESTAMP DEFAULT current_timestamp,
     PRIMARY KEY (code, signal_date)
@@ -70,20 +97,50 @@ CREATE TABLE IF NOT EXISTS malf_build_manifest (
 );
 """
 
-# 已有数据库的 migration（补齐日线节奏列）
+# 已有数据库的 migration（补齐新字段）
 _MIGRATION_STMTS = [
+    # 执行层主字段
+    "ALTER TABLE malf_context_snapshot ADD COLUMN IF NOT EXISTS long_background_2 VARCHAR DEFAULT 'UNKNOWN'",
+    "ALTER TABLE malf_context_snapshot ADD COLUMN IF NOT EXISTS intermediate_role_2 VARCHAR DEFAULT 'UNKNOWN'",
+    "ALTER TABLE malf_context_snapshot ADD COLUMN IF NOT EXISTS malf_context_4 VARCHAR DEFAULT 'UNKNOWN'",
+    # 日线节奏
     "ALTER TABLE malf_context_snapshot ADD COLUMN IF NOT EXISTS is_new_high_today BOOLEAN DEFAULT FALSE",
     "ALTER TABLE malf_context_snapshot ADD COLUMN IF NOT EXISTS new_high_seq INTEGER DEFAULT 0",
     "ALTER TABLE malf_context_snapshot ADD COLUMN IF NOT EXISTS days_since_last_new_high INTEGER",
     "ALTER TABLE malf_context_snapshot ADD COLUMN IF NOT EXISTS new_high_count_in_window INTEGER DEFAULT 0",
+    # 生命周期排位
+    "ALTER TABLE malf_context_snapshot ADD COLUMN IF NOT EXISTS amplitude_rank_low INTEGER",
+    "ALTER TABLE malf_context_snapshot ADD COLUMN IF NOT EXISTS amplitude_rank_high INTEGER",
+    "ALTER TABLE malf_context_snapshot ADD COLUMN IF NOT EXISTS amplitude_rank_total INTEGER",
+    "ALTER TABLE malf_context_snapshot ADD COLUMN IF NOT EXISTS duration_rank_low INTEGER",
+    "ALTER TABLE malf_context_snapshot ADD COLUMN IF NOT EXISTS duration_rank_high INTEGER",
+    "ALTER TABLE malf_context_snapshot ADD COLUMN IF NOT EXISTS duration_rank_total INTEGER",
+    "ALTER TABLE malf_context_snapshot ADD COLUMN IF NOT EXISTS new_price_rank_low INTEGER",
+    "ALTER TABLE malf_context_snapshot ADD COLUMN IF NOT EXISTS new_price_rank_high INTEGER",
+    "ALTER TABLE malf_context_snapshot ADD COLUMN IF NOT EXISTS new_price_rank_total INTEGER",
+    "ALTER TABLE malf_context_snapshot ADD COLUMN IF NOT EXISTS lifecycle_rank_low INTEGER",
+    "ALTER TABLE malf_context_snapshot ADD COLUMN IF NOT EXISTS lifecycle_rank_high INTEGER",
+    "ALTER TABLE malf_context_snapshot ADD COLUMN IF NOT EXISTS lifecycle_rank_total INTEGER",
+    # 四分位
+    "ALTER TABLE malf_context_snapshot ADD COLUMN IF NOT EXISTS amplitude_quartile VARCHAR",
+    "ALTER TABLE malf_context_snapshot ADD COLUMN IF NOT EXISTS duration_quartile VARCHAR",
+    "ALTER TABLE malf_context_snapshot ADD COLUMN IF NOT EXISTS new_price_quartile VARCHAR",
+    "ALTER TABLE malf_context_snapshot ADD COLUMN IF NOT EXISTS lifecycle_quartile VARCHAR",
 ]
 
 # 写入数据库的列名顺序（与 _context_to_row + run_id + created_at 对齐）
 _SNAPSHOT_COLS = (
-    "code", "signal_date", "monthly_state", "weekly_flow", "surface_label",
+    "code", "signal_date",
+    "long_background_2", "intermediate_role_2", "malf_context_4",
+    "monthly_state", "weekly_flow",
     "monthly_strength", "weekly_strength",
     "is_new_high_today", "new_high_seq", "days_since_last_new_high",
     "new_high_count_in_window",
+    "amplitude_rank_low", "amplitude_rank_high", "amplitude_rank_total",
+    "duration_rank_low", "duration_rank_high", "duration_rank_total",
+    "new_price_rank_low", "new_price_rank_high", "new_price_rank_total",
+    "lifecycle_rank_low", "lifecycle_rank_high", "lifecycle_rank_total",
+    "amplitude_quartile", "duration_quartile", "new_price_quartile", "lifecycle_quartile",
     "run_id", "created_at",
 )
 
@@ -124,26 +181,30 @@ def build_malf_context_for_stock(
         weekly_bars  — 周线 DataFrame（至少含 [week_start, close]）
         daily_bars   — 可选日线 DataFrame（至少含 [trade_date, close]）
     """
-    # 第一层：月线八态
+    # 计算层：月线八态
     monthly_state = classify_monthly_state(monthly_bars, signal_date)
     monthly_strength = compute_monthly_strength(monthly_bars, signal_date)
 
-    # 第二层：周线顺逆
+    # 计算层：周线顺逆
     weekly_flow = classify_weekly_flow(weekly_bars, monthly_state, signal_date)
     weekly_strength = compute_weekly_strength(weekly_bars, signal_date)
 
-    # 派生：表面标签
-    surface_label = build_surface_label(monthly_state, weekly_flow)
+    # 执行层：四格上下文
+    long_bg = derive_long_background_2(monthly_state)
+    inter_role = derive_intermediate_role_2(weekly_flow)
+    ctx4 = build_malf_context_4(monthly_state, weekly_flow)
 
-    # 第三层：日线节奏（可选，需要 L2 日线数据）
+    # 日线节奏（可选，需要 L2 日线数据）
     rhythm = compute_daily_rhythm(daily_bars, signal_date) if daily_bars is not None else {}
 
     return MalfContext(
         code=code,
         signal_date=signal_date,
+        long_background_2=long_bg,
+        intermediate_role_2=inter_role,
+        malf_context_4=ctx4,
         monthly_state=monthly_state,
         weekly_flow=weekly_flow,
-        surface_label=surface_label,
         monthly_strength=monthly_strength,
         weekly_strength=weekly_strength,
         **rhythm,
@@ -414,15 +475,33 @@ def _context_to_row(ctx: MalfContext) -> dict[str, Any]:
     return {
         "code": ctx.code,
         "signal_date": ctx.signal_date,
+        "long_background_2": ctx.long_background_2,
+        "intermediate_role_2": ctx.intermediate_role_2,
+        "malf_context_4": ctx.malf_context_4,
         "monthly_state": ctx.monthly_state,
         "weekly_flow": ctx.weekly_flow,
-        "surface_label": ctx.surface_label,
         "monthly_strength": ctx.monthly_strength,
         "weekly_strength": ctx.weekly_strength,
         "is_new_high_today": ctx.is_new_high_today,
         "new_high_seq": ctx.new_high_seq,
         "days_since_last_new_high": ctx.days_since_last_new_high,
         "new_high_count_in_window": ctx.new_high_count_in_window,
+        "amplitude_rank_low": ctx.amplitude_rank_low,
+        "amplitude_rank_high": ctx.amplitude_rank_high,
+        "amplitude_rank_total": ctx.amplitude_rank_total,
+        "duration_rank_low": ctx.duration_rank_low,
+        "duration_rank_high": ctx.duration_rank_high,
+        "duration_rank_total": ctx.duration_rank_total,
+        "new_price_rank_low": ctx.new_price_rank_low,
+        "new_price_rank_high": ctx.new_price_rank_high,
+        "new_price_rank_total": ctx.new_price_rank_total,
+        "lifecycle_rank_low": ctx.lifecycle_rank_low,
+        "lifecycle_rank_high": ctx.lifecycle_rank_high,
+        "lifecycle_rank_total": ctx.lifecycle_rank_total,
+        "amplitude_quartile": ctx.amplitude_quartile,
+        "duration_quartile": ctx.duration_quartile,
+        "new_price_quartile": ctx.new_price_quartile,
+        "lifecycle_quartile": ctx.lifecycle_quartile,
     }
 
 

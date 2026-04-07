@@ -24,7 +24,7 @@ class TradeRecord:
     entry_date: date
     exit_date: date | None
     signal_pattern: str
-    surface_label: str
+    malf_context_4: str
     entry_price: float
     exit_price: float | None
     lot_count: int

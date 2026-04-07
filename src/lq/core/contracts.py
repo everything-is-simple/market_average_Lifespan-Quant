@@ -10,7 +10,7 @@ from enum import Enum
 # ---------------------------------------------------------------------------
 
 class MonthlyState8(str, Enum):
-    """月线八态状态机 — MALF 第一层主轴。"""
+    """月线八态状态机 — MALF 计算层诊断状态，执行层收敛为 BULL/BEAR。"""
     BULL_FORMING = "BULL_FORMING"
     BULL_PERSISTING = "BULL_PERSISTING"
     BULL_EXHAUSTING = "BULL_EXHAUSTING"
@@ -40,13 +40,13 @@ class MonthlyState8(str, Enum):
 
 
 class WeeklyFlowRelation(str, Enum):
-    """周线与月线的顺逆关系 — MALF 第二层主轴。"""
+    """周线与月线的顺衰关系 — MALF 计算层，执行层映射为 MAINSTREAM/COUNTERTREND。"""
     WITH_FLOW = "with_flow"
     AGAINST_FLOW = "against_flow"
 
 
-class SurfaceLabel(str, Enum):
-    """16 格验证框架的四个表面标签。"""
+class MalfContext4(str, Enum):
+    """四格上下文 — MALF 执行层主轴。"""
     BULL_MAINSTREAM = "BULL_MAINSTREAM"
     BULL_COUNTERTREND = "BULL_COUNTERTREND"
     BEAR_MAINSTREAM = "BEAR_MAINSTREAM"
@@ -57,8 +57,8 @@ class SurfaceLabel(str, Enum):
         cls,
         monthly: MonthlyState8,
         weekly: WeeklyFlowRelation,
-    ) -> "SurfaceLabel":
-        """根据月线状态和周线顺逆生成表面标签。"""
+    ) -> "MalfContext4":
+        """根据月线状态和周线顺逆生成四格上下文。"""
         if monthly.is_bull and weekly == WeeklyFlowRelation.WITH_FLOW:
             return cls.BULL_MAINSTREAM
         if monthly.is_bull and weekly == WeeklyFlowRelation.AGAINST_FLOW:

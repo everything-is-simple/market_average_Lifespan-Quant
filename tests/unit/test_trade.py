@@ -29,7 +29,7 @@ def _make_state(
         total_lots=total_lots,
         active_lots=total_lots,
         signal_pattern="BOF",
-        surface_label="BULL_MAINSTREAM",
+        malf_context_4="BULL_MAINSTREAM",
         pb_sequence_number=1,
     )
 

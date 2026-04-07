@@ -10,7 +10,7 @@ from pathlib import Path
 from lq.core.contracts import (
     MonthlyState8,
     WeeklyFlowRelation,
-    SurfaceLabel,
+    MalfContext4,
     PasTriggerPattern,
     PasTriggerStatus,
     PAS_TRIGGER_STATUS,
@@ -47,34 +47,34 @@ class TestMonthlyState8:
         assert MonthlyState8.BULL_EXHAUSTING.is_trending is False
 
 
-class TestSurfaceLabel:
+class TestMalfContext4:
     def test_from_monthly_weekly_bull_mainstream(self):
-        result = SurfaceLabel.from_monthly_weekly(
+        result = MalfContext4.from_monthly_weekly(
             MonthlyState8.BULL_PERSISTING,
             WeeklyFlowRelation.WITH_FLOW,
         )
-        assert result == SurfaceLabel.BULL_MAINSTREAM
+        assert result == MalfContext4.BULL_MAINSTREAM
 
     def test_from_monthly_weekly_bull_countertrend(self):
-        result = SurfaceLabel.from_monthly_weekly(
+        result = MalfContext4.from_monthly_weekly(
             MonthlyState8.BULL_PERSISTING,
             WeeklyFlowRelation.AGAINST_FLOW,
         )
-        assert result == SurfaceLabel.BULL_COUNTERTREND
+        assert result == MalfContext4.BULL_COUNTERTREND
 
     def test_from_monthly_weekly_bear_mainstream(self):
-        result = SurfaceLabel.from_monthly_weekly(
+        result = MalfContext4.from_monthly_weekly(
             MonthlyState8.BEAR_PERSISTING,
             WeeklyFlowRelation.WITH_FLOW,
         )
-        assert result == SurfaceLabel.BEAR_MAINSTREAM
+        assert result == MalfContext4.BEAR_MAINSTREAM
 
     def test_from_monthly_weekly_bear_countertrend(self):
-        result = SurfaceLabel.from_monthly_weekly(
+        result = MalfContext4.from_monthly_weekly(
             MonthlyState8.BEAR_PERSISTING,
             WeeklyFlowRelation.AGAINST_FLOW,
         )
-        assert result == SurfaceLabel.BEAR_COUNTERTREND
+        assert result == MalfContext4.BEAR_COUNTERTREND
 
 
 class TestPasTriggerStatus:

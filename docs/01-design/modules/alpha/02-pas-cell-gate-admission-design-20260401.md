@@ -1,4 +1,4 @@
-# PAS 16 格准入表与 cell_gate_check 设计 / 2026-04-01
+# PAS 四格准入表与 cell_gate_check 设计 / 2026-04-07（重写）
 
 > 继承父系统 110/121/126/129/131 结论，冻结本系统准入判断规范。
 
@@ -7,9 +7,9 @@
 PAS 准入使用两层递进判断：
 
 ```
-第一层（surface_label，4格粗筛）
+第一层（malf_context_4，四格粗筛）
   ↓ 通过后
-第二层（monthly_state × weekly_flow，精确 16 格）
+第二层（monthly_state_8 × weekly_flow，精确 cell gate）
   ↓ 通过后
 进入 trigger 探测
 ```
@@ -19,16 +19,16 @@ PAS 准入使用两层递进判断：
 
 **两层都必须通过，才允许进行 trigger 探测。**
 
-## 2. 第一层：surface_label 准入表（ADMISSION_TABLE）
+## 2. 第一层：malf_context_4 准入表（ADMISSION_TABLE）
 
-`surface_label` 由 `monthly_state` 和 `weekly_flow` 派生：
+`malf_context_4` 由 `long_background_2`（BULL/BEAR）和 `intermediate_role_2`（MAINSTREAM/COUNTERTREND）组合：
 
-| surface_label | monthly_state 特征 | weekly_flow |
+| malf_context_4 | long_background_2 | intermediate_role_2 |
 |---|---|---|
-| `BULL_MAINSTREAM` | 任意 BULL_* | `with_flow` |
-| `BULL_COUNTERTREND` | 任意 BULL_* | `against_flow` |
-| `BEAR_MAINSTREAM` | 任意 BEAR_* | `with_flow` |
-| `BEAR_COUNTERTREND` | 任意 BEAR_* | `against_flow` |
+| `BULL_MAINSTREAM` | `BULL` | `MAINSTREAM` |
+| `BULL_COUNTERTREND` | `BULL` | `COUNTERTREND` |
+| `BEAR_MAINSTREAM` | `BEAR` | `MAINSTREAM` |
+| `BEAR_COUNTERTREND` | `BEAR` | `COUNTERTREND` |
 
 第一层准入表（`ADMISSION_TABLE`，位于 `validation.py`）：
 
@@ -40,9 +40,9 @@ PAS 准入使用两层递进判断：
 | TST | True | False | False | True |
 | CPB | False | False | False | False |
 
-## 3. 第二层：精确 16 格准入（CELL_GATE_TABLE）
+## 3. 第二层：精确 cell gate 准入（CELL_GATE_TABLE）
 
-`monthly_state_8` 取值（8 个）：
+`monthly_state_8` 取值（8 个，计算层诊断状态）：
 
 ```
 BULL_FORMING, BULL_PERSISTING, BULL_EXHAUSTING, BULL_REVERSING,
@@ -83,7 +83,7 @@ BEAR_FORMING, BEAR_PERSISTING, BEAR_EXHAUSTING, BEAR_REVERSING
 
 ```python
 def cell_gate_check(pattern: str, monthly_state: str, weekly_flow: str) -> bool:
-    """16 格精确准入判断（父系统冻结结论）。"""
+    """精确 cell gate 准入判断（父系统冻结结论）。"""
     admitted_cells = CELL_GATE_TABLE.get(pattern)
     if admitted_cells is None:
         return False
@@ -110,11 +110,11 @@ trace = detect_bof(code, signal_date, df)
 - PB/TST/CPB 是辅助工具，父系统三年验证发现它们只在 "牛市顺势" 和 "熊市逆势" 两个最纯净的方向格中有稳定效果。
 - 这与交易直觉吻合：PB/TST/CPB 在方向不纯的格中容易误判。
 
-### surface_label 为什么不够用？
+### malf_context_4 为什么不够用？
 
-- `surface_label` 把 BULL_FORMING / BULL_PERSISTING / BULL_EXHAUSTING / BULL_REVERSING 混合为同一个 `BULL_MAINSTREAM`。
+- `malf_context_4` 把 BULL_FORMING / BULL_PERSISTING / BULL_EXHAUSTING / BULL_REVERSING 混合为同一个 `BULL_MAINSTREAM`。
 - 但 BOF 只在 persisting 态主力，在 forming/exhausting 态样本稀疏。
-- 因此必须用第二层精确 16 格判断，而不能只依赖 surface_label。
+- 因此必须用第二层精确 cell gate 判断，而不能只依赖 malf_context_4。
 
 ## 6. 铁律
 

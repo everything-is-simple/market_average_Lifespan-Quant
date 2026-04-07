@@ -24,7 +24,7 @@ def _make_signal(
         code=code,
         signal_date=signal_date,
         pattern=pattern,
-        surface_label="BULL_MAINSTREAM",
+        malf_context_4="BULL_MAINSTREAM",
         strength=strength,
         signal_low=signal_low,
         entry_ref_price=entry_ref_price,

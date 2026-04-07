@@ -17,12 +17,18 @@ from lq.malf.contracts import MalfContext
 
 
 def _make_malf(monthly: str, weekly: str = "with_flow") -> MalfContext:
+    from lq.malf.contracts import build_malf_context_4, derive_long_background_2, derive_intermediate_role_2
+    bg2 = derive_long_background_2(monthly)
+    role2 = derive_intermediate_role_2(weekly)
+    ctx4 = build_malf_context_4(monthly, weekly)
     return MalfContext(
         code="000001.SZ",
         signal_date=date(2024, 6, 3),
+        long_background_2=bg2,
+        intermediate_role_2=role2,
+        malf_context_4=ctx4,
         monthly_state=monthly,
         weekly_flow=weekly,
-        surface_label=f"{monthly}_{weekly}",
     )
 
 

@@ -6,7 +6,7 @@ research_lab 数据库是 alpha 模块的唯一正式落库目标。
 表域分组：
   1. PAS 注册表（run 追踪）: pas_registry_run
   2. PAS 信号表（正式信号）: pas_selected_trace / pas_formal_signal
-  3. PAS 矩阵表（16 格验证）: pas_condition_matrix_run / pas_condition_matrix_cell
+  3. PAS 矩阵表（四格上下文验证）: pas_condition_matrix_run / pas_condition_matrix_cell
 """
 
 from __future__ import annotations
@@ -65,7 +65,7 @@ RESEARCH_LAB_SCHEMA_STATEMENTS = [
         code                VARCHAR NOT NULL,
         signal_date         DATE    NOT NULL,
         pattern             VARCHAR NOT NULL,       -- BOF / PB / BPB / TST / CPB
-        surface_label       VARCHAR NOT NULL,       -- BULL_MAINSTREAM / BULL_COUNTERTREND / ...
+        malf_context_4      VARCHAR NOT NULL,       -- BULL_MAINSTREAM / BULL_COUNTERTREND / ...
         strength            DOUBLE  NOT NULL,
         signal_low          DOUBLE  NOT NULL,       -- 信号最低价（止损参考）
         entry_ref_price     DOUBLE  NOT NULL,       -- 参考入场价
@@ -77,7 +77,7 @@ RESEARCH_LAB_SCHEMA_STATEMENTS = [
     """,
 
     # ---------------------------------------------------------------------------
-    # 4. PAS 16 格矩阵验证 run 元数据
+    # 4. PAS 四格上下文矩阵验证 run 元数据
     # ---------------------------------------------------------------------------
     """
     CREATE TABLE IF NOT EXISTS pas_condition_matrix_run (
@@ -92,14 +92,14 @@ RESEARCH_LAB_SCHEMA_STATEMENTS = [
     """,
 
     # ---------------------------------------------------------------------------
-    # 5. PAS 16 格矩阵验证：每个格子的统计结果
+    # 5. PAS 四格上下文矩阵验证：每个格子的统计结果
     # ---------------------------------------------------------------------------
     """
     CREATE TABLE IF NOT EXISTS pas_condition_matrix_cell (
         cell_id         VARCHAR PRIMARY KEY,
         run_id          VARCHAR NOT NULL,           -- 关联 pas_condition_matrix_run.run_id
         trigger_pattern VARCHAR NOT NULL,
-        surface_label   VARCHAR NOT NULL,           -- BULL_MAINSTREAM / BULL_COUNTERTREND / BEAR_MAINSTREAM / BEAR_COUNTERTREND
+        malf_context_4  VARCHAR NOT NULL,           -- BULL_MAINSTREAM / BULL_COUNTERTREND / BEAR_MAINSTREAM / BEAR_COUNTERTREND
         total_signals   INTEGER NOT NULL DEFAULT 0,
         win_count       INTEGER NOT NULL DEFAULT 0,
         lose_count      INTEGER NOT NULL DEFAULT 0,

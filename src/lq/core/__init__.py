@@ -27,7 +27,7 @@ from .contracts import (
     PRIMARY_INDEX_CODE,
     STAMP_DUTY_RATE,
     TRANSFER_FEE_RATE,
-    SurfaceLabel,
+    MalfContext4,
     StructureLevelType,
     TradeLifecycleState,
     VALIDATION_INDEX_CODES,
@@ -58,7 +58,7 @@ __all__ = [
     # contracts — 背景层
     "MonthlyState8",
     "WeeklyFlowRelation",
-    "SurfaceLabel",
+    "MalfContext4",
     # contracts — PAS 触发层
     "PasTriggerPattern",
     "PasTriggerStatus",
