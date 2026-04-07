@@ -160,7 +160,7 @@ MALF 的全部职责是一条流水线：
 |------|------|
 | `00-malf-charter` | 模块章程（本文） |
 | `01-malf-full-cycle-layering` | 月线 / 周线 / 日线三层分工设计 |
-| `03-malf-monthly-state-8` | 月线八态计算规格 |
-| `04-malf-weekly-flow-relation` | 周线顺逆计算规格 |
-| `06-malf-daily-rhythm-new-high-counting` | 日线新价结构计算规格 |
-| `07-malf-four-context-and-lifecycle-ranking-charter` | 四格上下文与生命周期三轴排位章程 |
+| `02-malf-monthly-state-8` | 月线八态计算规格 |
+| `03-malf-weekly-flow-relation` | 周线顺逆计算规格 |
+| `04-malf-daily-rhythm-new-high-counting` | 日线新价结构计算规格 |
+| `05-malf-four-context-and-lifecycle-ranking-charter` | 四格上下文与生命周期三轴排位章程 |
