@@ -1,5 +1,11 @@
 # MALF 三层矩阵合同规格 / 2026-04-01
 
+> 历史化说明：
+> 自 `016` 起，本文不再代表 `MALF` 当前正确的执行合同。
+> 保留原因：兼容既有历史 run 与报表读数。
+> 放弃原因：本文把三层矩阵定义为 `MALF` 主轴，却没有把"同标的历史中级波段三轴排名"写成正式执行合同。
+> 当前正确方向见 `02-malf-four-context-lifecycle-execution-contract-spec-20260407.md`。
+
 > 对应设计文档 `docs/01-design/modules/malf/02-malf-three-layer-matrix-frozen-contract-20260331.md`。
 
 ## 1. 范围

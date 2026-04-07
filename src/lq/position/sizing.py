@@ -1,5 +1,10 @@
 """1R 头寸规模计算。"""
 
+# 历史兼容说明：
+# 当前 sizing 仍是 fixed_notional 控制线，只承担研究阶段的最小资金桥接。
+# 自 016 起，它不再代表目标态；后续正确方向应是消费
+# MALF 生命周期读数（malf_context_4 + lifecycle 三轴排位）的 sizing 合同。
+
 from __future__ import annotations
 
 import math

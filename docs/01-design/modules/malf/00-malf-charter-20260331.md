@@ -100,11 +100,12 @@
 |---|---|---|
 | `00-malf-charter-20260331.md` | 模块章程（本文） | 父系统 `00` |
 | `01-malf-full-cycle-layering-frozen-design-20260331.md` | 全周期分层：月线/周线/日线三层职责边界 | 父系统 `10 / 12` |
-| `02-malf-three-layer-matrix-frozen-contract-20260331.md` | MALF 矩阵主轴冻结合同（月线×周线=16格）；pas_trigger 已移出 | 父系统 `13 / 14` |
-| `03-malf-monthly-state-8-frozen-definition-20260331.md` | 月线八态定义、判定阈值、五指数体系、已知 Gap | 父系统 `04 / 09 / 11` |
+| `02-malf-three-layer-matrix-frozen-contract-20260331.md` | ⚠️ 历史化：MALF 矩阵主轴冻结合同（月线×周线=16格）；已被 016 覆盖 | 父系统 `13 / 14` |
+| `03-malf-monthly-state-8-frozen-definition-20260331.md` | ⚠️ 历史化：月线八态定义（执行层已降级为诊断字段）；已被 016 覆盖 | 父系统 `04 / 09 / 11` |
 | `04-malf-weekly-flow-relation-frozen-definition-20260331.md` | 周线顺逆定义、判定规则、兼容别名 | 父系统 `12 / 13` |
-| `05-malf-pipeline-and-contracts-frozen-design-20260331.md` | Pipeline 流程、数据库 Schema、MalfContext 合同 | 父系统 `14` |
+| `05-malf-pipeline-and-contracts-frozen-design-20260331.md` | ⚠️ 历史化：Pipeline 流程、数据库 Schema、MalfContext 合同；已被 016 覆盖 | 父系统 `14` |
 | `06-malf-daily-rhythm-new-high-counting-design-20260401.md` | 日线节奏设计：新高日识别、计数、间距（立花义正思想） | 本系统新增 |
+| `07-malf-four-context-and-lifecycle-ranking-charter-20260407.md` | **当前正确方向**：四格上下文 + 生命周期三轴原始排位 + 四分位执行合同 | 父系统 `28`（016 卡） |
 
 ## 11. 代码出入修复记录（2026-03-31 / 2026-04-01）
 

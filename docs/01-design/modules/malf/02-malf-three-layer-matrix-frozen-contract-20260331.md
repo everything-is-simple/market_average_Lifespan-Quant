@@ -1,5 +1,11 @@
 # MALF 矩阵主轴冻结合同（月线 × 周线 = 16 格）/ 2026-03-31
 
+> 历史化说明：
+> 自 `016-malf-four-context-lifecycle-contract-reset-conclusion-20260407.md` 起，本文不再代表 `MALF` 当前正确的执行设计。
+> 保留原因：兼容既有 run、报表与结论链。
+> 放弃原因：本文把 `monthly_state_8 x weekly_flow_relation_to_monthly` 冻结成 `MALF` 主轴，弱化了"同标的历史中级波段生命周期排名"这一真正核心。
+> 当前正确方向见 `07-malf-four-context-and-lifecycle-ranking-charter-20260407.md`。
+
 > 继承来源：父系统 `13-malf-three-layer-matrix-modeling-charter-20260327.md` +
 > `14-malf-matrix-axis-contract-implementation-20260327.md`
 > 本文是当前系统最终定型口径，不允许在未另开执行卡的前提下修改主轴字段名或取值。

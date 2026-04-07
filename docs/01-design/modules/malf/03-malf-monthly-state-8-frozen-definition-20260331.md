@@ -1,5 +1,11 @@
 # MALF 月线八态冻结定义 / 2026-03-31
 
+> 历史化说明：
+> 自 `016` 起，月线八态不再是 `MALF` 的执行主轴。
+> 保留原因：计算层仍需八态区分阶段，兼容既有 run 与报表。
+> 放弃原因：八态会先把样本切碎，执行层真正需要的是 `BULL / BEAR` 二分背景 + 生命周期三轴排名。
+> 当前正确方向见 `07-malf-four-context-and-lifecycle-ranking-charter-20260407.md`。
+
 > 继承来源：父系统 `04-malf-long-trend-definition-and-validation-20260324.md` +
 > `09-malf-monthly-close-long-experiment-20260324.md` +
 > `11-malf-monthly-long-full-cycle-refinement-20260324.md`

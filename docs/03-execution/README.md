@@ -33,6 +33,7 @@
 
 已开卡：
 - `001` — **data 全链路 bootstrap**（txt 全量灌入 + 路径修正，2026-04-04）→ `001-data-full-pipeline-bootstrap-card-20260404.md`
+- `016` — **MALF 四格上下文与生命周期执行合同重定向**（design-reset / lifecycle-contract，2026-04-07）→ `016-malf-four-context-lifecycle-contract-reset-card-20260407.md` ✅ Closed
 
 待开卡（持久化主线，按依赖顺序执行）：
 - `002` — **malf 六层流水线持久化 bootstrap**（schema + batch runner + config_hash + checkpoint）→ `002-malf-persistence-bootstrap-card-20260406.md`；P0，所有下游依赖

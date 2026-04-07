@@ -10,6 +10,10 @@
 
 写权边界：只写 research_lab.duckdb，不写其他数据库。
 """
+# 历史兼容说明：
+# 本模块当前仍消费 monthly_state / surface_label / 16 格背景。
+# 自 016 起，它们只代表旧三层主轴兼容层，不再代表 MALF 生命周期
+# 主读数；后续应迁移到四格上下文与生命周期三轴排名合同。
 
 from __future__ import annotations
 

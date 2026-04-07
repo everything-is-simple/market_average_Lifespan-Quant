@@ -1,5 +1,11 @@
 # MALF Pipeline 与输出合同冻结设计 / 2026-03-31
 
+> 历史化说明：
+> 自 `016` 起，本文中的 `MalfContext` 合同与 `malf_context_snapshot` schema 只代表旧三层主轴输出。
+> 保留原因：现有 pipeline 和落表流程仍需运行，兼容既有 run。
+> 后续方向：新增 `execution_context_snapshot` 桥表，承载四格上下文 + 生命周期三轴排名。
+> 当前正确方向见 `07-malf-four-context-and-lifecycle-ranking-charter-20260407.md`。
+
 > 继承来源：父系统 `14-malf-matrix-axis-contract-implementation-20260327.md`
 > 本文冻结：pipeline 流程、输出表 schema、MalfContext 合同字段。
 
