@@ -33,14 +33,17 @@
 
 已开卡：
 - `001` — **data 全链路 bootstrap**（txt 全量灌入 + 路径修正，2026-04-04）→ `001-data-full-pipeline-bootstrap-card-20260404.md`
+- `002` — **malf 六层流水线持久化 bootstrap** → `002-malf-persistence-bootstrap-card-20260406.md` ✅ Closed（2026-04-07）
+- `003` — **structure 持久化层 bootstrap** → `003-structure-persistence-bootstrap-card-20260406.md` ✅ Closed（2026-04-07）
+- `004` — **filter 持久化层 bootstrap** → `004-filter-persistence-bootstrap-card-20260406.md` ✅ Closed（2026-04-07）
+- `005` — **research_lab 持久化 bootstrap**（alpha/pas） → `005-research-lab-persistence-bootstrap-card-20260406.md` ✅ Closed（2026-04-07）
+- `006` — **trade_runtime 持久化 bootstrap** → `006-trade-runtime-persistence-bootstrap-card-20260406.md` ✅ Closed（2026-04-07）
 - `016` — **MALF 四格上下文与生命周期执行合同重定向**（design-reset / lifecycle-contract，2026-04-07）→ `016-malf-four-context-lifecycle-contract-reset-card-20260407.md` ✅ Closed
 
-待开卡（持久化主线，按依赖顺序执行）：
-- `002` — **malf 六层流水线持久化 bootstrap**（schema + batch runner + config_hash + checkpoint）→ `002-malf-persistence-bootstrap-card-20260406.md`；P0，所有下游依赖
-- `003` — **structure 持久化层 bootstrap**（schema + batch runner + config_hash + checkpoint）→ `003-structure-persistence-bootstrap-card-20260406.md`；依赖 002
-- `004` — **filter 持久化层 bootstrap**（schema + batch runner + config_hash + checkpoint）→ `004-filter-persistence-bootstrap-card-20260406.md`；依赖 002 + 003
-- `005` — **research_lab 持久化 bootstrap**（alpha/pas + position；config_hash trigger 参数域 + batch runner）→ `005-research-lab-persistence-bootstrap-card-20260406.md`；依赖 004
-- `006` — **trade_runtime 持久化 bootstrap**（TradeManager 批量回测 + config_hash + checkpoint）→ `006-trade-runtime-persistence-bootstrap-card-20260406.md`；依赖 005
+002-006 合并闭环：
+- 证据：`evidence/002-006-persistence-pipeline-evidence-20260407.md`
+- 记录：`records/002-006-persistence-pipeline-record-20260407.md`
+- 结论：`002-006-persistence-pipeline-conclusion-20260407.md`
 
 待开卡（验证层，待 002-006 完成后启动）：
 - `007` — **malf 端到端验证**（四格上下文 / 月线八态诊断 / 周线流向 / 生命周期排位）→ `007-malf-end-to-end-validation-card-20260406.md`；依赖 002
