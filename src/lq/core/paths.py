@@ -42,7 +42,7 @@ class DatabasePaths:
 
     raw_market: Path       # L1 原始日线（TDX txt 全量 + .day 增量）+ xdxr（gbbq）
     market_base: Path      # L2 复权价、周月线聚合、均线、量比
-    malf: Path             # L3 MALF 三层主轴快照（月线/周线/PAS合同）
+    malf: Path             # L3 MALF 快照（月线/周线计算层 + 未来 execution_context_snapshot）
     structure: Path        # L3 结构位快照（支撑/阻力/突破），按日按股追加
     filter: Path           # L3 不利条件检查结果，按日按股追加
     research_lab: Path     # L3 PAS 信号 + 仓位计划，按信号追加

@@ -1,121 +1,165 @@
-# MALF 模块章程 / 2026-03-31
+# MALF 模块章程 / 2026-04-07（重构版）
 
-## 1. 血统与来源
+## 1. 模块定位
 
-| 层代 | 系统 | 状态 |
-|---|---|---|
-| 爷爷系统 | `G:\。backups\EmotionQuant-gamma` 的 `gene` 模块 | 思想原型，仅参考 |
-| 父系统 | `G:\MarketLifespan-Quant\docs\01-design\modules\malf\` | 正式定型，完整设计 |
-| 本系统 | `H:\Lifespan-Quant\src\lq\malf\` | 继承父系统冻结合同，新增 `structure` 前置层 |
+`malf`（Market Average Lifespan Framework）是**趋势生命周期经验统计系统**。
 
-本模块直接继承父系统已验证的三层矩阵主轴合同，不重新发明轮子。  
-父系统文档是本模块设计的权威参考。若本文档与父系统冻结文档冲突，以父系统 `13 / 14` 号文档为准。
+它回答一个问题：**当前趋势的生命走到哪里了？**
 
-## 2. 模块定位
+## 2. 血统
 
-`malf` 是市场与个股结构背景引擎。
+父系统 `G:\MarketLifespan-Quant\docs\01-design\modules\malf\` 是本模块设计的权威参考。
+当前权威设计文档：父系统 `28` 号（四格上下文与生命周期排名章程）。
 
-它负责把月线、周线的价格结构转化为三层矩阵主轴快照，
-以 `MalfContext` 合同对象输出给 `filter` 与 `alpha/pas` 消费。
+## 3. 回答方法
 
-本模块只负责背景计算与输出，**不负责**触发信号、交易决策或仓位管理。
+回答分两步，二者不可分割——上下文分类让排位有意义，排位是系统的核心输出：
 
-## 3. 三层矩阵主轴（冻结）
+**第一步：上下文分类** — 把当前中级波段归入四格之一，使历史样本可比。
 
-| 轴 | 字段 | 正式取值 |
-|---|---|---|
-| 第一层（月线背景） | `monthly_state` | `BULL_FORMING / BULL_PERSISTING / BULL_EXHAUSTING / BULL_REVERSING / BEAR_FORMING / BEAR_PERSISTING / BEAR_EXHAUSTING / BEAR_REVERSING` |
-| 第二层（周线顺逆） | `weekly_flow` | `with_flow / against_flow` |
-| 派生（表面标签） | `surface_label` | `BULL_MAINSTREAM / BULL_COUNTERTREND / BEAR_MAINSTREAM / BEAR_COUNTERTREND` |
+| 计算 | 产出 | 取值 |
+|------|------|------|
+| 月线价格结构判断长期牛熊 | `long_background_2` | `BULL / BEAR` |
+| 周线相对月线判断顺势逆势 | `intermediate_role_2` | `MAINSTREAM / COUNTERTREND` |
+| 组合 | `malf_context_4` | 四格（见 §4） |
 
-兼容别名规则：`CONFIRMED_BULL → BULL_PERSISTING`，`CONFIRMED_BEAR → BEAR_PERSISTING`；`MAINSTREAM → with_flow`，`COUNTERTREND → against_flow`。
+**第二步：生命周期排位** — 在同一四格内，用三把尺子度量当前波段在历史同类中的位置。
 
-## 4. 正式输入
+| 尺子 | 度量 | 回答 |
+|------|------|------|
+| 波动幅度 | 当前波段已走出的价格振幅 | 走了多远 |
+| 时间跨度 | 当前波段已持续的交易时间 | 走了多久 |
+| 新价结构 | 创新高/新低的次数与间隔 | 推进节奏如何 |
 
-1. `market_base.duckdb` 中的 `stock_monthly_adjusted`（后复权月线，`adjust_method='backward'`）
-2. `market_base.duckdb` 中的 `stock_weekly_adjusted`（后复权周线）
-3. `market_base.duckdb` 中的 `index_monthly` / `index_weekly`
-4. `market_base.duckdb` 中的 `trade_calendar`
+每把尺子产出原始历史排位区间 → 三轴相加得到总生命区间 → 四分位压缩辅助执行。
 
-**不接受** old `gene` 的运行期表作为输入。
+## 4. 四格上下文
 
-## 5. 正式输出
+| 格 | 含义 |
+|----|------|
+| `BULL_MAINSTREAM` | 长期牛市，中级波段顺势 |
+| `BULL_COUNTERTREND` | 长期牛市，中级波段逆势 |
+| `BEAR_MAINSTREAM` | 长期熊市，中级波段顺势 |
+| `BEAR_COUNTERTREND` | 长期熊市，中级波段逆势 |
 
-| 输出对象 | 类型 | 去向 |
-|---|---|---|
-| `MalfContext` | `dataclass`（冻结合同） | 传给 `filter` 和 `alpha/pas`，不落库 |
-| `MalfContextSnapshot` | `dataclass` | 批量构建摘要，可落 `malf.duckdb` |
-| `MALFBuildManifest` | `dataclass` | 运行元数据，可落 `malf.duckdb` |
+规则：
 
-`MalfContext` 是本模块对外唯一正式合同。模块间只传此对象，不传内部中间特征。
+1. 只有同一标的、同一格内的历史已完成中级波段，才是可比样本。
+2. 当前活跃波段可被排位，但不得反向进入自己的历史样本池。
 
-## 6. 模块边界
+## 5. 生命周期三轴
 
-### 6.1 负责
+### 5.1 三轴定义
 
-1. 月线八态计算（趋势方向 + 阶段）
-2. 周线顺逆关系计算（相对月线的顺势 / 逆势）
-3. 日线节奏计算（新高日计数、新高间距——立花义正「新高日」思想）
-4. 表面标签派生（`surface_label`）
-5. `MalfContext` 快照批量构建与更新
-6. 宽基指数市场背景池（`MARKET_CONTEXT_ENTITY_CODE`）计算
+| 轴 | 度量对象 | 含义 |
+|----|----------|------|
+| 波动幅度 | 当前中级波段已走出的价格振幅 | 走了多远 |
+| 时间跨度 | 当前中级波段已持续的交易时间 | 走了多久 |
+| 新价结构 | 创新高/新低的次数与间隔 | 推进节奏如何 |
 
-### 6.2 不负责
+**新价结构**包含两个维度：
 
-1. `market_base` 的拥有与构建（属于 `data` 模块）
-2. PAS trigger 探测（属于 `alpha/pas` 模块）
-3. 结构位识别（属于 `structure` 模块）
-4. 不利条件过滤（属于 `filter` 模块）
-5. 交易执行与仓位管理（属于 `trade` / `position` 模块）
+- **次数**：当前波段第几次创新高/新低（牛市计新高，熊市计新低）。
+- **间隔**：相邻两次创新价之间的交易日数。间隔放大 = 趋势活力衰竭的早期信号。
 
-## 7. 与父系统的核心差异
+这是立花义正「新高日」思想的计算层实现，扩展为同时覆盖新高与新低。
 
-| 项目 | 父系统 | 本系统 |
-|---|---|---|
-| 结构分析 | MALF 内部处理 | 外置到独立 `structure` 模块 |
-| PAS trigger | 与 MALF 紧耦合 | `alpha/pas` 独立模块，读 `MalfContext` |
-| 波段对象链 | `daily K → pivot → wave → event → surface` 完整保留 | 简化为三层主轴快照，波段对象链为可选实现 |
-| 包名 | `mlq.malf` | `lq.malf` |
+### 5.2 原始排位
 
-## 8. 铁律
+每轴输出原始历史排位区间：
 
-1. `MalfContext` 是唯一对外合同，禁止其他模块读 MALF 内部中间表。
-2. 月线八态取值必须是冻结枚举，不允许自造新值。
-3. 兼容别名必须在模块内部转换完毕，对外输出只用正式字段名。
-4. `monthly_state` 和 `weekly_flow` 必须通过 `__post_init__` 防御校验。
-5. MALF 计算必须以 `market_base` 层作为唯一数据来源，不允许直接读原始日线。
+| 字段 | 含义 |
+|------|------|
+| `amplitude_rank_low / high / total` | 波幅在历史同类中的排位区间 |
+| `duration_rank_low / high / total` | 时间在历史同类中的排位区间 |
+| `new_price_rank_low / high / total` | 新价结构在历史同类中的排位区间 |
 
-## 9. 成功标准
+- `low / high`：当前波段夹在历史样本的哪两个相邻名次之间。
+- `total`：该标的、该四格下可比历史样本总数。
+- 若当前值恰好与某历史名次重合，允许 `low = high`。
+- 保留原味排位（如 `28/281 -- 29/281`），不先归一化。
 
-1. `MalfContext` 合同冻结，字段名与父系统兼容
-2. 月线八态能正确识别并区分牛市四阶段与熊市四阶段
-3. 周线顺逆能正确计算相对月线的方向关系
-4. `surface_label` 四值正确派生
-5. 批量构建能在 `market_base.duckdb` 覆盖全市场股票后正常运行
-6. `MalfContext` 能被 `filter` 与 `alpha/pas` 消费并通过测试
+### 5.3 总生命区间
 
-## 10. 本模块设计文档索引
+三轴小值/大值简单相加：
 
-| 文档 | 内容 | 继承父系统来源 |
-|---|---|---|
-| `00-malf-charter-20260331.md` | 模块章程（本文） | 父系统 `00` |
-| `01-malf-full-cycle-layering-frozen-design-20260331.md` | 全周期分层：月线/周线/日线三层职责边界 | 父系统 `10 / 12` |
-| `02-malf-three-layer-matrix-frozen-contract-20260331.md` | ⚠️ 历史化：MALF 矩阵主轴冻结合同（月线×周线=16格）；已被 016 覆盖 | 父系统 `13 / 14` |
-| `03-malf-monthly-state-8-frozen-definition-20260331.md` | ⚠️ 历史化：月线八态定义（执行层已降级为诊断字段）；已被 016 覆盖 | 父系统 `04 / 09 / 11` |
-| `04-malf-weekly-flow-relation-frozen-definition-20260331.md` | 周线顺逆定义、判定规则、兼容别名 | 父系统 `12 / 13` |
-| `05-malf-pipeline-and-contracts-frozen-design-20260331.md` | ⚠️ 历史化：Pipeline 流程、数据库 Schema、MalfContext 合同；已被 016 覆盖 | 父系统 `14` |
-| `06-malf-daily-rhythm-new-high-counting-design-20260401.md` | 日线节奏设计：新高日识别、计数、间距（立花义正思想） | 本系统新增 |
-| `07-malf-four-context-and-lifecycle-ranking-charter-20260407.md` | **当前正确方向**：四格上下文 + 生命周期三轴原始排位 + 四分位执行合同 | 父系统 `28`（016 卡） |
+| 字段 | 公式 |
+|------|------|
+| `lifecycle_rank_low` | `amplitude_rank_low + duration_rank_low + new_price_rank_low` |
+| `lifecycle_rank_high` | `amplitude_rank_high + duration_rank_high + new_price_rank_high` |
+| `lifecycle_rank_total` | `amplitude_rank_total + duration_rank_total + new_price_rank_total` |
 
-## 11. 代码出入修复记录（2026-03-31 / 2026-04-01）
+### 5.4 四分位压缩
 
-本轮整理中发现并修复的代码出入点：
+| 字段 | 含义 |
+|------|------|
+| `amplitude_quartile` | 波幅轴四分位（Q1 / Q2 / Q3 / Q4） |
+| `duration_quartile` | 时间轴四分位 |
+| `new_price_quartile` | 新价结构轴四分位 |
+| `lifecycle_quartile` | 总生命四分位（辅助） |
 
-| 文件 | 问题 | 修复 |
-|---|---|---|
-| `src/lq/malf/pipeline.py` | `monthly_bar` / `weekly_bar` 表名不存在 | 改为 `stock_monthly_adjusted` / `stock_weekly_adjusted` |
-| `src/lq/malf/pipeline.py` | `month_start` / `week_start` 列名与 bootstrap schema 不一致 | 使用 `month_start_date AS month_start` 等别名 |
-| `src/lq/malf/pipeline.py` | 无 `adjust_method` 过滤条件 | 补 `AND adjust_method = 'backward'` |
+四分位必须晚于原始排位产生，不得覆盖原始排位读数。
 
-以下已知 Gap 待后续执行卡处理（见文档 `03`）：
-- ~~`monthly.py` 的 `classify_monthly_state()` 缺少 `BEAR_REVERSING` 显式返回路径~~ ✅ 已在 2026-04-01 修复：在上升趋势分支补充了 `BEAR_REVERSING` 的显式返回路径（`rebound_from_low < MONTHLY_LONG_BULL_REVERSAL_PCT` 时返回 `BEAR_REVERSING`）
+## 6. 正式输入
+
+所有输入均来自 `market_base.duckdb`，取后复权价（`adjust_method='backward'`）：
+
+| 表 | 用途 |
+|----|------|
+| `stock_monthly_adjusted` | 月线 → 长期牛熊判断 |
+| `stock_weekly_adjusted` | 周线 → 顺势逆势判断 |
+| `stock_daily_adjusted` | 日线 → 新价结构度量 |
+| `index_monthly` / `index_weekly` | 宽基指数市场背景 |
+| `trade_calendar` | 交易日历 |
+
+## 7. 正式输出
+
+`execution_context_snapshot`（DuckDB 桥表）：承载四格上下文 + 生命周期三轴排位，供下游消费。
+
+| 字段类 | 字段 |
+|--------|------|
+| 定位 | `entity_scope` / `entity_code` / `calc_date` / `active_wave_id` |
+| 上下文 | `long_background_2` / `intermediate_role_2` / `malf_context_4` |
+| 排位 | `amplitude_rank_*` / `duration_rank_*` / `new_price_rank_*` / `lifecycle_rank_*`（各 `low / high / total`） |
+| 四分位 | `amplitude_quartile` / `duration_quartile` / `new_price_quartile` / `lifecycle_quartile` |
+
+## 8. 模块边界
+
+MALF 的全部职责是一条流水线：
+
+1. 月线价格结构 → `long_background_2`（BULL / BEAR）
+2. 周线相对月线 → `intermediate_role_2`（MAINSTREAM / COUNTERTREND）
+3. 组合 → `malf_context_4`
+4. 日线新价结构度量（新高/新低次数、间隔）
+5. 在同一四格内对历史已完成中级波段排位
+6. 输出 `execution_context_snapshot`
+7. 宽基指数市场背景池计算
+
+**不负责**：数据采集与复权（`data`）、结构位识别（`structure`）、不利条件过滤（`filter`）、PAS 触发器探测（`alpha/pas`）、仓位管理与交易执行（`position / trade`）。
+
+## 9. 铁律
+
+1. 执行层主读数是 `malf_context_4` + 三轴原始排位 + 四分位。
+2. 三轴排位必须保留原始历史名次区间，不先归一化。
+3. 四分位只是压缩辅助，不得覆盖三轴原始排位读数。
+4. 只有同一标的、同一四格的历史已完成中级波段才是可比样本。
+5. MALF 以 `market_base` 为唯一数据来源。
+
+## 10. 成功标准
+
+1. 四格上下文能正确分类每个标的的当前中级波段。
+2. 三轴原始排位能输出正确的历史名次区间。
+3. 新价结构度量能正确识别新高/新低次数与间隔。
+4. `lifecycle_rank_*` 由三轴正确相加。
+5. 批量构建能覆盖全市场。
+6. 下游 `filter` / `alpha/pas` / `position` 能消费 `execution_context_snapshot`。
+
+## 11. 设计文档索引
+
+| 文档 | 内容 |
+|------|------|
+| `00-malf-charter` | 模块章程（本文） |
+| `01-malf-full-cycle-layering` | 月线 / 周线 / 日线三层职责边界 |
+| `04-malf-weekly-flow-relation` | 周线顺逆判定规则 |
+| `06-malf-daily-rhythm-new-high-counting` | 日线新价结构度量设计 |
+| `07-malf-four-context-and-lifecycle-ranking-charter` | 四格上下文 + 生命周期排位详细规格 |

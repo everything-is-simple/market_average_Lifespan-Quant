@@ -1,9 +1,8 @@
-"""malf — 市场平均寿命框架（Market Average Lifespan Framework）。
+"""malf — 趋势生命周期经验统计系统（Market Average Lifespan Framework）。
 
-三层主轴：
-1. monthly_state_8  — 月线八态
-2. weekly_flow      — 周线顺逆
-3. daily_rhythm     — 日线新高日节奏（立花义正思想）
+正式设计方向：
+  上下文分类（malf_context_4）→ 生命周期三轴排位（amplitude/duration/new_price）→ 四分位压缩。
+  当前代码仅实现计算层（月线八态 / 周线顺逆 / 日线节奏），执行层桥表待实现。
 """
 
 from .contracts import (

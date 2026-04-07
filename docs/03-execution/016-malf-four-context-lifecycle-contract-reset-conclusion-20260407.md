@@ -8,7 +8,7 @@
 
 1. `MALF` 当前正确的设计主轴，已从"`monthly_state_8 x weekly_flow_relation_to_monthly x pas_trigger`"重定向为"`四格上下文 + 生命周期三轴原始排位 + 四分位辅助表达`"。
 2. 书图所表达的"当前趋势位于历史分布的什么位置"，当前正式解释为：同标的、同四格上下文的历史已完成中级波段样本上，对 `波动幅度 / 时间跨度 / 新高频率` 三轴分别保存原始名次区间，例如 `28/281 -- 29/281`；随后把三条轴的小值简单相加、把三条轴的大值简单相加，得到当前中级生命总区间。
-3. `monthly_state_8 / weekly_flow_relation_to_monthly / scene_id / scene quartile / 16-cell` 仍可保留，但正式地位已降为兼容、诊断与追溯字段；它们不再代表 `MALF` 生命周期主读数。
+3. `monthly_state_8 / weekly_flow_relation_to_monthly` 仍可保留，但正式地位已降为兼容、诊断与追溯字段；父系统的 `scene_id / scene quartile / 16-cell` 概念（本系统无）同样不再代表 `MALF` 生命周期主读数。
 
 ## 当前边界
 

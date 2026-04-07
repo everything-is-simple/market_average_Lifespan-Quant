@@ -19,12 +19,12 @@
 
 **从爷爷继承**：执行语义（T+1 Open）、合同传递模式、代码规范
 
-**从父系统继承**：5 目录纪律、数据库架构（本系统扩展为七库全持久化）、MALF 三层主轴、PAS 触发器治理、mootdx 数据源
+**从父系统继承**：5 目录纪律、数据库架构（本系统扩展为七库全持久化）、MALF 计算层（月线/周线/日线）、PAS 触发器治理、mootdx 数据源
 
 **父系统冻结口径**（`2026-04-03`）：研究验证版主线基本闭环，可持续日更、可复跑、可审计；非正式上线。
 详见：`docs/04-reference/battle-tested-lessons-core-data-malf-from-v001-20260403.md`
 
-**本系统新增**：`structure` 模块（结构位语言）、`filter` 模块（不利条件过滤）、`TradeManager` 5 阶段状态机、`core` 枚举集中化
+**本系统新增**：`structure` 模块（结构位语言）、`filter` 模块（不利条件过滤）、`TradeManager` 5 阶段状态机、`core` 枚举集中化、MALF 四格上下文与生命周期三轴排位重定向（016 卡）
 
 ---
 
@@ -34,10 +34,10 @@
 |------|------|--------|
 | `core` | 公共类型、路径合同、跨模块枚举 | 无 |
 | `data` | 市场数据采集（mootdx）、清洗、落盘 | raw_market / market_base |
-| `malf` | 市场平均寿命框架：monthly_state_8 / weekly_flow | malf |
+| `malf` | 趋势生命周期经验统计：四格上下文 + 三轴排位（amplitude/duration/new_price） | malf |
 | `structure` | 统一结构位合同：波段高低点、突破分类 **（新增）** | structure |
 | `filter` | 不利市场条件过滤器：5 类条件检测 **（新增）** | filter |
-| `alpha/pas` | 五触发器：BOF/BPB/PB/TST/CPB + 16 格验证 | research_lab |
+| `alpha/pas` | 五触发器：BOF/BPB/PB/TST/CPB + 四格上下文准入 | research_lab |
 | `position` | 1R 风险单位、头寸规模、退出合同 | research_lab |
 | `trade` | 交易管理模板、执行 runtime、TradeManager | trade_runtime |
 | `system` | 编排总控、回测、治理检查 | trade_runtime |
@@ -87,7 +87,7 @@
 |----|------|-------|------|----------|
 | `raw_market` | `data/raw/` | data | TDX 本地 .day + gbbq 除权除息 | 按日追加 |
 | `market_base` | `data/base/` | data | 复权价、均线、量比 | 只算新日期 |
-| `malf` | `data/malf/` | malf | MALF 三层主轴输出 | 新月/新周 |
+| `malf` | `data/malf/` | malf | MALF 计算层 + execution_context_snapshot | 新月/新周 |
 | `structure` | `data/structure/` | structure | 结构位快照（支撑/阻力/突破） | 按日按股追加 |
 | `filter` | `data/filter/` | filter | 不利条件检查结果 | 按日按股追加 |
 | `research_lab` | `data/research/` | alpha+position | PAS 信号 + 仓位计划 | 按信号追加 |

@@ -7,7 +7,7 @@
 
 ## 执行记录
 
-1. 新增 `07` 号 design / `02` 号 spec，正式写清四格上下文、生命周期三轴原始排位（amplitude/duration/new_high_frequency 的 rank_low/rank_high/rank_total）、四分位压缩、总生命区间（lifecycle_rank_low/high/total = 三轴小值/大值简单相加）、`execution_context_snapshot` 桥表、PAS 接口、position 接口。
+1. 新增 `07` 号 design / `02` 号 spec，正式写清四格上下文、生命周期三轴原始排位（amplitude/duration/new_price 的 rank_low/rank_high/rank_total）、四分位压缩、总生命区间（lifecycle_rank_low/high/total = 三轴小值/大值简单相加）、`execution_context_snapshot` 桥表、PAS 接口、position 接口。
 2. 对 `02/03/05` 号 design 与 `01` 号 spec 补充"被 016 覆盖"的历史化说明，明确旧三层矩阵 / 16 格路径不再代表当前正确设计。
 3. 对 `lq.malf.contracts` / `lq.alpha.pas.pipeline` / `lq.position.sizing` 中仍显式消费旧三层主轴或固定仓位的兼容实现补充中文注释，明确其当前只具历史兼容身份。
 4. 更新 `00-malf-charter-20260331.md` 文档索引，补入 `07` 号文档。

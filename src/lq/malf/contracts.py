@@ -4,7 +4,7 @@
 # 当前 MalfContext 合同仍以 monthly_state_8 / weekly_flow / surface_label
 # 三层主轴为核心字段。自 016 起，这套三层主轴不再代表 MALF 正确的
 # 生命周期执行合同；后续正式方向应改为消费
-# malf_context_4 + lifecycle 三轴原始排位（amplitude/duration/new_high_frequency）。
+# malf_context_4 + lifecycle 三轴原始排位（amplitude/duration/new_price）。
 # 现有 MalfContext 保留只为兼容既有 run 与 pipeline。
 
 from __future__ import annotations

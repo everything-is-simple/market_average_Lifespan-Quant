@@ -1,7 +1,11 @@
 # MALF 周线顺逆关系冻结定义 / 2026-03-31
 
 > 继承来源：父系统 `12-malf-monthly-weekly-coordination-20260324.md` +
-> `13-malf-three-layer-matrix-modeling-charter-20260327.md`
+> `13-malf-three-layer-matrix-modeling-charter-20260327.md`（已历史化）
+>
+> **2026-04-07 补注**：父系统 `13` 已于 `281` 卡降级为历史兼容。
+> 本文的周线顺逆概念仍然有效——它 feeds into 执行层的 `intermediate_role_2`（`MAINSTREAM / COUNTERTREND`）。
+> `with_flow` 映射为 `MAINSTREAM`，`against_flow` 映射为 `COUNTERTREND`。
 
 ## 1. 定义（冻结）
 

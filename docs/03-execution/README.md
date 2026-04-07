@@ -43,7 +43,7 @@
 - `006` — **trade_runtime 持久化 bootstrap**（TradeManager 批量回测 + config_hash + checkpoint）→ `006-trade-runtime-persistence-bootstrap-card-20260406.md`；依赖 005
 
 待开卡（验证层，待 002-006 完成后启动）：
-- `007` — **malf 三层主轴端到端验证**（月线 8 态 / 周线流向 / 16 格标签）→ `007-malf-end-to-end-validation-card-20260406.md`；依赖 002
+- `007` — **malf 端到端验证**（四格上下文 / 月线八态诊断 / 周线流向 / 生命周期排位）→ `007-malf-end-to-end-validation-card-20260406.md`；依赖 002
 - `008` — **BOF 在 BULL_MAINSTREAM 格的独立三年验证**（2020-2022 胜率 / R 倍数 / 净收益）→ `008-bof-bull-mainstream-three-year-validation-card-20260406.md`；依赖 006
 - `009` — **structure 与 BOF 联合验证**（结构位区分力 / available_space_pct 阈值）→ `009-structure-bof-joint-validation-card-20260406.md`；依赖 006
 - `010` — **filter 不利条件过滤器效果评估**（五类条件触发率 / 三组对比 / 逐类贡献）→ `010-filter-adverse-condition-evaluation-card-20260406.md`；依赖 006
