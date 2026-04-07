@@ -1,42 +1,45 @@
-# MALF 月线八态冻结定义 / 2026-03-31
-
-> 历史化说明：
-> 自 `016` 起，月线八态不再是 `MALF` 的执行主轴。
-> 保留原因：计算层仍需八态区分阶段，兼容既有 run 与报表。
-> 放弃原因：八态会先把样本切碎，执行层真正需要的是 `BULL / BEAR` 二分背景 + 生命周期三轴排名。
-> 当前正确方向见 `07-malf-four-context-and-lifecycle-ranking-charter-20260407.md`。
+# MALF 月线八态计算规格 / 2026-03-31（重构版）
 
 > 继承来源：父系统 `04-malf-long-trend-definition-and-validation-20260324.md` +
 > `09-malf-monthly-close-long-experiment-20260324.md` +
 > `11-malf-monthly-long-full-cycle-refinement-20260324.md`
-> 阈值来自 `src/lq/malf/contracts.py`（父系统 MarketLifespan-Quant 验证数据）。
 
-## 1. 月线八态定义（冻结）
+## 1. 定位
+
+月线八态（`monthly_state_8`）是 MALF 计算层的第一层输出。
+
+- 计算层：八态区分月线所处阶段（形成/持续/衰竭/反转 × 牛/熊）
+- 执行层：八态收敛为 `long_background_2`（`BULL / BEAR`），参与四格上下文分类
+
+## 2. 八态定义
 
 | 状态 | 含义 | 信号特征 |
-|---|---|---|
-| `BULL_FORMING` | 牛市形成中 | 从历史/近期低点反弹 ≥ 20%，趋势向上但尚未充分展开 |
-| `BULL_PERSISTING` | 牛市持续中 | 主升浪，价格持续创新高，趋势明确向上 |
-| `BULL_EXHAUSTING` | 牛市衰竭中 | 高位涨速放缓，顶部信号累积，仍处于高位 |
+|------|------|----------|
+| `BULL_FORMING` | 牛市形成中 | 从低点反弹 ≥ 20%，趋势向上但尚未充分展开 |
+| `BULL_PERSISTING` | 牛市持续中 | 主升浪，价格持续创新高 |
+| `BULL_EXHAUSTING` | 牛市衰竭中 | 高位涨速放缓，顶部信号累积 |
 | `BULL_REVERSING` | 牛市反转中 | 牛市明确转折，从高点开始向下 |
-| `BEAR_FORMING` | 熊市形成中 | 趋势向下确认，但熊市尚未充分展开 |
-| `BEAR_PERSISTING` | 熊市持续中 | 主跌浪，价格持续创新低，趋势明确向下 |
-| `BEAR_EXHAUSTING` | 熊市衰竭中 | 低位跌速放缓，底部信号累积，仍处于低位 |
-| `BEAR_REVERSING` | 熊市反转中 | 熊市明确转折，从低点开始向上，进入下一轮 BULL_FORMING |
+| `BEAR_FORMING` | 熊市形成中 | 趋势向下确认，尚未充分展开 |
+| `BEAR_PERSISTING` | 熊市持续中 | 主跌浪，价格持续创新低 |
+| `BEAR_EXHAUSTING` | 熊市衰竭中 | 低位跌速放缓，底部信号累积 |
+| `BEAR_REVERSING` | 熊市反转中 | 从低点开始向上，进入下一轮 BULL_FORMING |
 
-循环顺序（正常周期）：
-```
+循环顺序：
+
+```text
 BULL_FORMING → BULL_PERSISTING → BULL_EXHAUSTING → BULL_REVERSING
      ↓                                                    ↓
 BEAR_REVERSING ← BEAR_EXHAUSTING ← BEAR_PERSISTING ← BEAR_FORMING
 ```
 
-## 2. 判定阈值（冻结，来自父系统验证）
+收敛映射：`BULL_*` → `long_background_2 = BULL`，`BEAR_*` → `long_background_2 = BEAR`。
 
-阈值定义在 `src/lq/malf/contracts.py`，不允许随意修改：
+## 3. 判定阈值
 
-| 常量名 | 值 | 说明 |
-|---|---|---|
+阈值定义在 `src/lq/malf/contracts.py`：
+
+| 常量 | 值 | 说明 |
+|------|-----|------|
 | `MONTHLY_LONG_BULL_REVERSAL_PCT` | 0.20 | 牛市反转确认：从低点反弹 ≥ 20% |
 | `MONTHLY_LONG_BEAR_REVERSAL_PCT` | 0.18 | 熊市反转确认：从高点下跌 ≥ 18% |
 | `MONTHLY_LONG_MIN_BAR_COUNT` | 2 | 最小月线 K 线数量 |
@@ -44,51 +47,25 @@ BEAR_REVERSING ← BEAR_EXHAUSTING ← BEAR_PERSISTING ← BEAR_FORMING
 | `MONTHLY_LONG_BEAR_MIN_DURATION_MONTHS` | 4 | 熊市最小持续月数 |
 | `MONTHLY_LONG_BULL_MIN_AMPLITUDE_PCT` | 25.0 | 牛市最小涨幅 (%) |
 | `MONTHLY_LONG_BEAR_MIN_AMPLITUDE_PCT` | 18.0 | 熊市最小跌幅 (%) |
-| `MONTHLY_LONG_EXHAUSTION_RATIO` | 0.6 | 衰竭判定：近期涨/跌速 < 前期的 60% |
+| `MONTHLY_LONG_EXHAUSTION_RATIO` | 0.6 | 衰竭判定：涨/跌速 < 前期 60% |
 | `MONTHLY_VALIDATION_LOOKBACK_MONTHS` | 12 | 验证回看月数 |
 
-若要修改阈值，必须：
-1. 另开独立执行卡
-2. 提供样本验证证据
-3. 更新 `contracts.py` 中的常量（不允许直接硬编码在函数体内）
+修改阈值须另开执行卡 + 提供样本验证证据 + 更新 `contracts.py` 常量。
 
-## 3. 五指数体系（冻结）
-
-月线背景分析的正式指数锚：
+## 4. 五指数体系
 
 | 角色 | 代码 | 说明 |
-|---|---|---|
-| 主锚 | `000001.SH` | 上证综指，唯一主锚，由此给出第一读数 |
-| 验证指数 | `000300.SH` | 沪深 300 |
-| 验证指数 | `399001.SZ` | 深证成指 |
-| 验证指数 | `399006.SZ` | 创业板指 |
-| 验证指数 | `000688.SH` | 科创 50 |
+|------|------|------|
+| 主锚 | `000001.SH` | 上证综指 |
+| 验证 | `000300.SH` | 沪深 300 |
+| 验证 | `399001.SZ` | 深证成指 |
+| 验证 | `399006.SZ` | 创业板指 |
+| 验证 | `000688.SH` | 科创 50 |
 
-验证规则：
-- 至少 **2 个**验证指数与主锚同向 → 主趋势已获得验证
-- 至少 **2 个**验证指数与主锚反向 → 主趋势受到挑战
-
-代码常量：`PRIMARY_LONG_TREND_INDEX_CODE`、`LONG_TREND_VALIDATION_INDEX_CODES`、`MIN_LONG_TREND_VALIDATION_PASS_COUNT = 2`
-
-## 4. 与旧口径的差异（继承父系统纠偏）
-
-| 旧口径 | 当前正式口径 |
-|---|---|
-| 长期趋势看周线 | 长期趋势只看月线收盘线 |
-| 用 1-2-3 慢确认链 | 用保护位破坏 + 反弹/回撤幅度判定 |
-| 衰竭靠定性描述 | 衰竭靠量化速度比较（`EXHAUSTION_RATIO`） |
+验证规则：至少 2 个验证指数与主锚同向 → 主趋势获得验证。
 
 ## 5. 实现入口
 
-- 月线状态判定：`src/lq/malf/monthly.py` → `classify_monthly_state()`
-- 月线强度计算：`src/lq/malf/monthly.py` → `compute_monthly_strength()`
-- 常量定义：`src/lq/malf/contracts.py`
-
-## 6. 已知实现 Gap（已修正）
-
-> **2026-04-04 修正完成**：以下两个 Gap 已在 `monthly.py` 中修复。
-
-1. ~~`BEAR_REVERSING` 状态未被显式返回~~——已修正：`ma6_direction = True` + `rebound_from_low < 20%` → `BEAR_REVERSING`。
-2. ~~`BULL_REVERSING` 触发逻辑语义偏差~~——已修正：改为 `ma6_direction = False` + `drawdown_from_high < 0` + `amplitude ≥ 25%`（近期有过显著上涨说明此前确实有牛市行情）→ `BULL_REVERSING`。
-
-修正后八态均可显式返回，不影响 `BOF / PB` 主线验证结果。
+- `src/lq/malf/monthly.py` → `classify_monthly_state()`
+- `src/lq/malf/monthly.py` → `compute_monthly_strength()`
+- `src/lq/malf/contracts.py` → 常量定义
