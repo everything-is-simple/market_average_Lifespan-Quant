@@ -21,10 +21,12 @@ from .contracts import (
 from .daily import compute_daily_rhythm
 from .pipeline import (
     MALF_SCHEMA_SQL,
+    MalfBuildResult,
     bootstrap_malf_storage,
     build_malf_context_for_stock,
-    run_malf_batch,
-    run_malf_batch_incremental,
+    list_stock_codes,
+    list_trading_dates,
+    run_malf_build,
 )
 
 __all__ = [
@@ -46,8 +48,10 @@ __all__ = [
     "compute_daily_rhythm",
     # pipeline
     "MALF_SCHEMA_SQL",
+    "MalfBuildResult",
     "bootstrap_malf_storage",
     "build_malf_context_for_stock",
-    "run_malf_batch",
-    "run_malf_batch_incremental",
+    "list_stock_codes",
+    "list_trading_dates",
+    "run_malf_build",
 ]
