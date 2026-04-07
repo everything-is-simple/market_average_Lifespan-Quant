@@ -19,6 +19,12 @@ from .detector import (
     classify_breakout_event,
     build_structure_snapshot,
 )
+from .pipeline import (
+    STRUCTURE_SCHEMA_SQL,
+    StructureBuildResult,
+    bootstrap_structure_storage,
+    run_structure_build,
+)
 
 __all__ = [
     "StructureLevel",
@@ -29,4 +35,9 @@ __all__ = [
     "find_horizontal_levels",
     "classify_breakout_event",
     "build_structure_snapshot",
+    # pipeline
+    "STRUCTURE_SCHEMA_SQL",
+    "StructureBuildResult",
+    "bootstrap_structure_storage",
+    "run_structure_build",
 ]

@@ -10,7 +10,7 @@ from .detectors import (
     detect_cpb,
     run_all_detectors,
 )
-from .pipeline import run_pas_batch
+from .pipeline import run_pas_batch, run_pas_build, PasBuildResult, list_stock_codes
 from .validation import SixteenCellMatrix, build_16cell_matrix
 
 __all__ = [
@@ -30,6 +30,9 @@ __all__ = [
     "run_all_detectors",
     # pipeline
     "run_pas_batch",
+    "run_pas_build",
+    "PasBuildResult",
+    "list_stock_codes",
     # validation
     "SixteenCellMatrix",
     "build_16cell_matrix",

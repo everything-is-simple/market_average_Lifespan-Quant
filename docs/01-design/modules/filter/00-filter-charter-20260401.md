@@ -129,11 +129,40 @@ from lq.malf.contracts import MalfContext
 
 ---
 
-## 6. 铁律
+## 6. 持久化 pipeline（2026-04-07 实现）
+
+### 6.1 数据库
+
+`filter.duckdb`（L3 层），由 `filter` 模块独占写入。
+
+| 表 | 职责 |
+|---|---|
+| `filter_snapshot` | 主输出：每只股票每日的不利条件检查结果（tradeable / active_conditions / notes） |
+| `filter_build_manifest` | 构建元数据（run_id / status / asof_date） |
+
+### 6.2 构建模式
+
+| 模式 | 入口 | 说明 |
+|---|---|---|
+| 全量构建 | `python scripts/filter/build_filter_snapshot.py --start 2015-01-01 --end 2026-04-07` | 首次历史回填 |
+| 日增量 | `python scripts/filter/build_filter_snapshot.py --date 2026-04-07` | 每日收盘后追加 |
+| 断点续传 | `python scripts/filter/build_filter_snapshot.py --start ... --end ... --resume` | 中断后从上次日期继续 |
+
+### 6.3 pipeline 实现
+
+- `filter/pipeline.py` — `run_filter_build()` 按日期逐日处理，每日内按 `batch_size` 分批处理股票
+- 依赖 `malf.duckdb`（读 surface_label）和 `structure.duckdb`（读最近支撑/阻力价）
+- 每批完成立即写入 `filter.duckdb`（先删后插，幂等）
+- 每个日期完成后保存 JSON checkpoint（`core.resumable`）
+- `bootstrap_filter_storage()` 初始化 schema（幂等）
+
+---
+
+## 7. 铁律
 
 1. **filter 拥有 `filter.duckdb`**：不利条件结果按日按股增量追加，历史一旦计算绝不重算
 2. **增量更新**：只处理新日期，每行带 `config_hash`，参数冻结则跳过已有数据
-2. **每条件独立**：每个 `_check_xxx()` 函数必须独立返回 bool，不允许相互依赖
+3. **每条件独立**：每个 `_check_xxx()` 函数必须独立返回 bool，不允许相互依赖
 3. **任一触发即 False**：`tradeable = (active_conditions == [])` ——OR 关系触发，AND 关系通过
 4. **不判断信号有效性**：filter 只说"状态不对"，不说"没有信号"；`tradeable=False` 不等于市场无机会
 5. **参数常量统一管理**：所有阈值（COMPRESSION_WINDOW、MIN_SPACE_PCT 等）必须在本模块顶部声明，禁止在调用处写死数值

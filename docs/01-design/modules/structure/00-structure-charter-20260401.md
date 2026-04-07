@@ -102,11 +102,40 @@ from lq.core.contracts import StructureLevelType, BreakoutType  # 只依赖 core
 
 ---
 
-## 6. 铁律
+## 6. 持久化 pipeline（2026-04-07 实现）
+
+### 6.1 数据库
+
+`structure.duckdb`（L3 层），由 `structure` 模块独占写入。
+
+| 表 | 职责 |
+|---|---|
+| `structure_snapshot` | 主输出：每只股票每日的结构位快照（支撑/阻力位、突破事件、结构清晰度） |
+| `structure_build_manifest` | 构建元数据（run_id / status / asof_date） |
+
+### 6.2 构建模式
+
+| 模式 | 入口 | 说明 |
+|---|---|---|
+| 全量构建 | `python scripts/structure/build_structure_snapshot.py --start 2015-01-01 --end 2026-04-07` | 首次历史回填 |
+| 日增量 | `python scripts/structure/build_structure_snapshot.py --date 2026-04-07` | 每日收盘后追加 |
+| 断点续传 | `python scripts/structure/build_structure_snapshot.py --start ... --end ... --resume` | 中断后从上次日期继续 |
+
+### 6.3 pipeline 实现
+
+- `structure/pipeline.py` — `run_structure_build()` 按日期逐日处理，每日内按 `batch_size` 分批处理股票
+- 每批完成立即写入 `structure.duckdb`（先删后插，幂等）
+- 每个日期完成后保存 JSON checkpoint（`core.resumable`）
+- `bootstrap_structure_storage()` 初始化 schema（幂等）
+- 嵌套对象（`StructureLevel` / `BreakoutEvent`）以 JSON 序列化存储，关键标量字段（`nearest_support_price` 等）同时存为独立列
+
+---
+
+## 7. 铁律
 
 1. **structure 拥有 `structure.duckdb`**：结构位快照按日按股增量追加，历史一旦计算绝不重算
 2. **增量更新**：只处理新日期，每行带 `config_hash`，参数冻结则跳过已有数据
-2. **无 MALF 依赖**：结构位识别只看价格行为，不依赖月线/周线背景（背景判断属于 filter）
+3. **无 MALF 依赖**：结构位识别只看价格行为，不依赖月线/周线背景（背景判断属于 filter）
 3. **结构位合同格式冻结**：`StructureSnapshot` 的字段结构一旦发布不允许缩减（只允许向后兼容添加）
 4. **强度公式固定**：`strength = 0.5 * age_decay + touch_bonus`，不允许在不同调用路径中使用不同公式
 5. **禁止入场判断**：`structure` 模块禁止返回任何"可以入场"或"不可以入场"的结论，只描述结构事实

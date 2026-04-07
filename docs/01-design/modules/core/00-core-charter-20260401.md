@@ -23,7 +23,7 @@
 
 **本系统当前实现（v0.1.0）：**
 1. `contracts.py`：4 组枚举（背景层 / PAS 触发层 / 结构位层 / 交易管理层）+ 5 类常量，**已完成**
-2. `paths.py`：WorkspaceRoots（5 根）+ DatabasePaths（5 库）+ `default_settings()` + `tdx_root()` + `tushare_token_path()`，**已完成**
+2. `paths.py`：WorkspaceRoots（5 根）+ DatabasePaths（**7 库**）+ `default_settings()` + `tdx_root()` + `tushare_token_path()`，**已完成**
 3. `calendar.py`：A 股最小交易日历（`is_trading_day` / `next_trading_day`，2024-2027 节假日硬编码），**已完成**
 4. `checkpoint.py`：`JsonCheckpointStore` 长任务 checkpoint 存储，**已完成（2026-04-02）**
 5. `resumable.py`：6 个续跑 helper（`stable_json_dumps / build_resume_digest / resolve_default_checkpoint_path / prepare_resumable_checkpoint / save_resumable_checkpoint / parse_optional_date`），**已完成（2026-04-02）**
@@ -33,6 +33,7 @@
 | 差异点 | 父系统（MarketLifespan） | 本系统（Lifespan-Quant） |
 |---|---|---|
 | workspace 根数 | 4（repo/data/temp/report） | **5**（+validated_root） |
+| 数据库路径数 | 5 | **7**（+structure / filter） |
 | 枚举定义位置 | 各模块 contracts 自己定义 | **统一在 core.contracts** |
 | 结构位/filter 枚举 | 无（无此模块） | **有**（StructureLevelType/BreakoutType/AdverseConditionType） |
 | 配置机制 | pydantic 部分，env var 覆盖 | **纯 env var 注入**，无 pydantic |
@@ -65,7 +66,7 @@ core/
 
 1. **枚举与类型**：跨模块共用的枚举（背景层 / PAS / 结构位 / 交易管理）
 2. **业务常量**：A 股交易费率、默认资金参数、指数代码、LOT_SIZE
-3. **路径合同**：WorkspaceRoots（5 目录）、DatabasePaths（5 数据库）
+3. **路径合同**：WorkspaceRoots（5 目录）、DatabasePaths（**7 数据库**：raw_market / market_base / malf / structure / filter / research_lab / trade_runtime）
 4. **路径解析**：`default_settings()`、`discover_repo_root()`、`tdx_root()`、`tushare_token_path()`
 5. **PAS 治理状态**：`PAS_TRIGGER_STATUS` 字典（冻结当前每个触发器的治理状态）
 6. **交易日历**：`is_trading_day()`、`next_trading_day()`（A 股节假日，2024-2027）

@@ -29,7 +29,9 @@
 **本系统（Lifespan-Quant）当前实现：**
 1. `TradeManagementState + TradeManager` — 5阶段有状态机，已实现，已测试
 2. `TradeRecord` — 单笔交易完整结果合同，已定义
-3. **待补**：Broker 类、BacktestEngine、trade_runtime schema、成本模型
+3. `trade/pipeline.py` — `run_trade_build()` 多日期批量回测 + 断点续传，**已实现（2026-04-07）**
+4. `bootstrap_trade_storage()` — trade_runtime.duckdb schema 初始化，**已实现**
+5. **待补**：Broker 类、BacktestEngine（完整版）、成本模型
 
 ### 1.2 从开源项目借鉴的关键设计
 

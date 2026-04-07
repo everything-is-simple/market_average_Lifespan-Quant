@@ -366,12 +366,45 @@ def bootstrap_trade_runtime(database_path: Path | None = None) -> Path:
 
 ---
 
-## 9. 扩展路径
+## 9. 当前实现状态（2026-04-07）
+
+`trade/pipeline.py` 当前实现了**最小可运行 schema（3 张表）**：
+
+| 表 | 状态 | 说明 |
+|---|---|---|
+| `trade_record` | ✅ 已实现 | 简化版：无 FK、无 signal_id/entry_notional/entry_cost/exit_cost/gross_pnl/net_pnl/hold_days/first_target_hit 列 |
+| `trade_run_summary` | ✅ 已实现 | 回测 run 汇总（对应设计 `backtest_summary` 的简化版） |
+| `trade_build_manifest` | ✅ 已实现 | 构建元数据 |
+| `trade_run` | ⏳ 待实现 | Broker/BacktestEngine 完成后补 |
+| `order_event` | ⏳ 待实现 | 需要 Broker 订单系统 |
+| `fill_record` | ⏳ 待实现 | 需要成本模型 |
+| `position_daily_snapshot` | ⏳ 待实现 | 需要 BacktestEngine 日循环 |
+| `daily_equity_curve` | ⏳ 待实现 | 需要 BacktestEngine 日循环 |
+| `drawdown_analysis` | ⏳ 待实现 | 需要 equity curve |
+
+### 9.1 构建模式
+
+| 模式 | 入口 | 说明 |
+|---|---|---|
+| 全量回测 | `python scripts/trade/build_trade_backtest.py --start 2015-01-01 --end 2026-04-07` | 历史回填 |
+| 日增量 | `python scripts/trade/build_trade_backtest.py --date 2026-04-07` | 每日收盘后追加 |
+| 断点续传 | `python scripts/trade/build_trade_backtest.py --start ... --end ... --resume` | 中断后从上次日期继续 |
+
+### 9.2 pipeline 实现
+
+- `trade/pipeline.py` — `run_trade_build()` 按日期逐日处理：读 PAS 信号 → 计算头寸 → TradeManager 模拟 → 写 trade_record
+- 每日完成后保存 JSON checkpoint（`core.resumable`）
+- `bootstrap_trade_storage()` 初始化 schema（幂等）
+
+---
+
+## 10. 扩展路径
 
 当以下需求出现时，按顺序扩展：
 
 ```
-P1（当前）：8 张核心表
+P1（当前）：3 张核心表（trade_record + trade_run_summary + trade_build_manifest）
+P1.5（补齐 8 表）：+ trade_run, order_event, fill_record, position_daily_snapshot, daily_equity_curve
 P2（滚动回测）：+ rebalance_period, rebalance_signal, rebalance_position
 P3（实盘对接）：+ broker_order_instruction, broker_session_state
 P4（企业行动）：+ corporate_action_adjustment_event

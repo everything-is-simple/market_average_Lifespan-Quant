@@ -18,7 +18,10 @@ sys.path.insert(0, str(_REPO_ROOT / "src"))
 from lq.core.paths import default_settings
 from lq.alpha.pas.bootstrap import bootstrap_research_lab
 from lq.data.bootstrap import bootstrap_data_storage
+from lq.filter.pipeline import bootstrap_filter_storage
 from lq.malf.pipeline import bootstrap_malf_storage
+from lq.structure.pipeline import bootstrap_structure_storage
+from lq.trade.pipeline import bootstrap_trade_storage
 
 
 def main(dry_run: bool = False) -> None:
@@ -56,12 +59,24 @@ def main(dry_run: bool = False) -> None:
     bootstrap_malf_storage(dbs.malf)
     print("✓ malf 数据库 schema 初始化完成")
 
+    # 初始化 structure 数据库
+    bootstrap_structure_storage(dbs.structure)
+    print("✓ structure 数据库 schema 初始化完成")
+
+    # 初始化 filter 数据库
+    bootstrap_filter_storage(dbs.filter)
+    print("✓ filter 数据库 schema 初始化完成")
+
     # 初始化 research_lab 数据库（alpha/pas 正式信号表）
     bootstrap_research_lab(dbs.research_lab)
     print("✓ research_lab 数据库 schema 初始化完成")
 
+    # 初始化 trade_runtime 数据库
+    bootstrap_trade_storage(dbs.trade_runtime)
+    print("✓ trade_runtime 数据库 schema 初始化完成")
+
     print()
-    print("存储初始化完成。下一步：运行 fetch_daily.py 拉取行情数据。")
+    print("存储初始化完成。七库 schema 全部就绪。")
 
 
 if __name__ == "__main__":

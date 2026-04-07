@@ -403,7 +403,53 @@ def _safe_run_step(
 
 ---
 
-## 9. 全链路依赖图
+## 9. 七库持久化 pipeline 总览（2026-04-07 实现）
+
+每个模块拥有独立的 `pipeline.py`，统一遵循相同模式：批量构建 + 日增量 + 断点续传。
+
+| 层级 | 数据库 | Owner | 构建入口 | 构建函数 |
+|---|---|---|---|---|
+| L1 | `raw_market.duckdb` | data | `scripts/data/run_tdx_*` | data 层独立 |
+| L2 | `market_base.duckdb` | data | `scripts/data/build_l2_*.py` | data 层独立 |
+| L3 | `malf.duckdb` | malf | `scripts/malf/build_malf_snapshot.py` | `run_malf_build()` |
+| L3 | `structure.duckdb` | structure | `scripts/structure/build_structure_snapshot.py` | `run_structure_build()` |
+| L3 | `filter.duckdb` | filter | `scripts/filter/build_filter_snapshot.py` | `run_filter_build()` |
+| L3 | `research_lab.duckdb` | alpha/pas | `scripts/alpha/build_pas_signals.py` | `run_pas_build()` |
+| L4 | `trade_runtime.duckdb` | trade | `scripts/trade/build_trade_backtest.py` | `run_trade_build()` |
+
+### 统一 bootstrap
+
+```bash
+python scripts/data/bootstrap_storage.py
+# → 七库 schema 全部初始化（幂等）
+```
+
+### 全链路批量构建顺序
+
+```bash
+# 1. 数据层（L1 → L2）
+python scripts/data/run_tdx_local_daily_update.py ...
+python scripts/data/build_l2_backward_adjustment.py ...
+
+# 2. MALF（L3）
+python scripts/malf/build_malf_snapshot.py --start ... --end ...
+
+# 3. structure（L3，不依赖 malf）
+python scripts/structure/build_structure_snapshot.py --start ... --end ...
+
+# 4. filter（L3，依赖 malf + structure）
+python scripts/filter/build_filter_snapshot.py --start ... --end ...
+
+# 5. alpha/pas（L3，依赖 market_base + malf）
+python scripts/alpha/build_pas_signals.py --start ... --end ...
+
+# 6. trade（L4，依赖 market_base + research_lab）
+python scripts/trade/build_trade_backtest.py --start ... --end ...
+```
+
+---
+
+## 10. 全链路依赖图
 
 ```
 run_daily_signal_scan()

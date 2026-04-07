@@ -199,7 +199,7 @@ def classify_breakout_event(
         return None
 
     df = df.sort_values("date").reset_index(drop=True)
-    recent = df[df["date"] <= signal_date].tail(lookback_days)
+    recent = df[df["date"] <= pd.Timestamp(signal_date)].tail(lookback_days)
 
     if len(recent) < 2:
         return None

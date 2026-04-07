@@ -123,7 +123,33 @@
 | 排位 | `amplitude_rank_*` / `duration_rank_*` / `new_price_rank_*` / `lifecycle_rank_*`（各 `low / high / total`） |
 | 四分位 | `amplitude_quartile` / `duration_quartile` / `new_price_quartile` / `lifecycle_quartile` |
 
-## 8. 模块边界
+## 8. 持久化 pipeline（2026-04-07 实现）
+
+### 8.1 数据库
+
+`malf.duckdb`（L3 层），由 `malf` 模块独占写入。
+
+| 表 | 职责 |
+|---|---|
+| `malf_context_snapshot` | 主输出：每只股票每日的 MALF 上下文快照 |
+| `malf_build_manifest` | 构建元数据（run_id / status / asof_date） |
+
+### 8.2 构建模式
+
+| 模式 | 入口 | 说明 |
+|---|---|---|
+| 全量构建 | `python scripts/malf/build_malf_snapshot.py --start 2015-01-01 --end 2026-04-07` | 首次历史回填 |
+| 日增量 | `python scripts/malf/build_malf_snapshot.py --date 2026-04-07` | 每日收盘后追加 |
+| 断点续传 | `python scripts/malf/build_malf_snapshot.py --start ... --end ... --resume` | 中断后从上次日期继续 |
+
+### 8.3 pipeline 实现
+
+- `malf/pipeline.py` — `run_malf_build()` 按日期逐日处理，每日内按 `batch_size` 分批处理股票
+- 每批完成立即写入 `malf.duckdb`（先删后插，幂等）
+- 每个日期完成后保存 JSON checkpoint（`core.resumable`）
+- `bootstrap_malf_storage()` 初始化 schema（幂等，含 migration）
+
+## 9. 模块边界
 
 MALF 的全部职责是一条流水线：
 

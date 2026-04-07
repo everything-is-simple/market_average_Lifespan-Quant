@@ -17,6 +17,7 @@
 
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass, field
 from datetime import date, datetime
 from pathlib import Path
@@ -31,6 +32,10 @@ from lq.alpha.pas.contracts import PasDetectTrace, PasSignal, PasBatchResult
 from lq.alpha.pas.detectors import run_all_detectors
 from lq.alpha.pas.validation import cell_gate_check
 from lq.core.contracts import PasTriggerPattern
+from lq.core.paths import WorkspaceRoots, default_settings
+from lq.core.resumable import prepare_resumable_checkpoint, save_resumable_checkpoint
+
+logger = logging.getLogger(__name__)
 
 
 def _run_id() -> str:
@@ -297,3 +302,179 @@ def _write_to_research_lab(
                 "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 signal_rows,
             )
+
+
+# ---------------------------------------------------------------------------
+# 多日期批量构建（断点续传封装）
+# ---------------------------------------------------------------------------
+
+@dataclass
+class PasBuildResult:
+    """PAS 多日期批量构建结果摘要。"""
+
+    run_id: str = field(
+        default_factory=lambda: f"pas-build-{datetime.utcnow().strftime('%Y%m%dT%H%M%SZ')}-{uuid4().hex[:8]}"
+    )
+    dates_total: int = 0
+    dates_completed: int = 0
+    dates_skipped: int = 0
+    total_signals: int = 0
+    total_scanned: int = 0
+    errors: int = 0
+    status: str = "completed"
+
+
+def list_stock_codes(market_base_path: Path) -> list[str]:
+    """从 market_base 获取所有有日线数据的股票代码。"""
+    with duckdb.connect(str(market_base_path), read_only=True) as conn:
+        rows = conn.execute(
+            "SELECT DISTINCT code FROM stock_daily_adjusted ORDER BY code"
+        ).fetchall()
+    return [r[0] for r in rows]
+
+
+def run_pas_build(
+    *,
+    market_base_path: Path,
+    malf_db_path: Path,
+    research_lab_path: Path,
+    signal_dates: Sequence[date],
+    codes: Sequence[str] | None = None,
+    patterns: list[str] | None = None,
+    lookback_days: int = 240,
+    resume: bool = False,
+    reset_checkpoint: bool = False,
+    settings: WorkspaceRoots | None = None,
+    verbose: bool = True,
+) -> PasBuildResult:
+    """PAS 多日期批量构建，支持断点续传。
+
+    对每个 signal_date 调用 run_pas_batch()，逐日推进并保存 checkpoint。
+
+    参数：
+        market_base_path  — market_base.duckdb（只读）
+        malf_db_path      — malf.duckdb（只读）
+        research_lab_path — research_lab.duckdb（读写）
+        signal_dates      — 待构建日期列表
+        codes             — 股票代码列表（None = 全市场）
+        patterns          — 指定 trigger 列表，None = 全部五个
+        lookback_days     — 向前读取多少交易日日线
+        resume            — 从 checkpoint 续跑
+        reset_checkpoint  — 清空旧 checkpoint 重跑
+        settings          — WorkspaceRoots（用于 checkpoint 路径）
+        verbose           — 打印进度
+    """
+    if not signal_dates:
+        return PasBuildResult(status="empty")
+
+    bootstrap_research_lab(research_lab_path)
+
+    # 解析股票代码
+    if codes is None:
+        codes = list_stock_codes(market_base_path)
+        if verbose:
+            print(f"自动获取全市场股票：{len(codes)} 只")
+    all_codes = list(codes)
+
+    result = PasBuildResult(dates_total=len(signal_dates))
+
+    # 准备 checkpoint
+    if settings is None:
+        settings = default_settings()
+    fingerprint = {
+        "research_lab": str(research_lab_path),
+        "dates_range": f"{signal_dates[0]}..{signal_dates[-1]}",
+        "codes_count": len(all_codes),
+        "patterns": patterns or "all",
+    }
+    store, state = prepare_resumable_checkpoint(
+        checkpoint_path=None,
+        settings_root=settings,
+        domain="alpha",
+        runner_name="build_pas_signals",
+        fingerprint=fingerprint,
+        resume=resume,
+        reset_checkpoint=reset_checkpoint,
+    )
+
+    # 恢复已完成日期
+    completed_dates: set[str] = set()
+    if state is not None:
+        completed_dates = set(state.get("completed_dates", []))
+        if verbose:
+            print(f"从 checkpoint 恢复：已完成 {len(completed_dates)} 个日期")
+
+    # 标记运行中
+    save_resumable_checkpoint(store, fingerprint=fingerprint, payload={
+        "status": "running",
+        "completed_dates": sorted(completed_dates),
+        "run_id": result.run_id,
+    })
+
+    # 逐日处理
+    for idx, sig_date in enumerate(signal_dates):
+        date_key = sig_date.isoformat()
+
+        if date_key in completed_dates:
+            result.dates_skipped += 1
+            continue
+
+        if verbose:
+            print(
+                f"  [{idx + 1}/{len(signal_dates)}] {date_key}",
+                end="", flush=True,
+            )
+
+        try:
+            batch_result = run_pas_batch(
+                signal_date=sig_date,
+                codes=all_codes,
+                market_base_path=market_base_path,
+                malf_db_path=malf_db_path,
+                research_lab_path=research_lab_path,
+                patterns=patterns,
+                lookback_days=lookback_days,
+                verbose=False,
+            )
+            result.total_signals += batch_result.triggered_count
+            result.total_scanned += batch_result.codes_scanned
+            result.dates_completed += 1
+            completed_dates.add(date_key)
+
+            if verbose:
+                print(f" → 扫描 {batch_result.codes_scanned}，触发 {batch_result.triggered_count}")
+
+        except Exception as exc:
+            result.errors += 1
+            logger.warning("PAS 构建失败 %s: %s", date_key, exc)
+            if verbose:
+                print(f" → 失败: {exc}")
+
+        # 每日保存 checkpoint
+        save_resumable_checkpoint(store, fingerprint=fingerprint, payload={
+            "status": "running",
+            "completed_dates": sorted(completed_dates),
+            "run_id": result.run_id,
+            "last_date": date_key,
+        })
+
+    # 完成状态
+    if result.errors > 0 and result.dates_completed == 0:
+        result.status = "failed"
+    elif result.errors > 0:
+        result.status = "partial"
+
+    save_resumable_checkpoint(store, fingerprint=fingerprint, payload={
+        "status": "done",
+        "completed_dates": sorted(completed_dates),
+        "run_id": result.run_id,
+    })
+
+    if verbose:
+        print(
+            f"\n完成：{result.dates_completed} 日完成 / "
+            f"{result.dates_skipped} 日跳过 / {result.dates_total} 日总计"
+        )
+        print(f"扫描 {result.total_scanned}，触发 {result.total_signals} 信号，失败 {result.errors}")
+
+    return result
