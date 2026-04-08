@@ -4,23 +4,20 @@
 
 ## 1. 定位
 
-周线顺逆（`weekly_flow`）是 MALF 计算层的第二层输出。
+周线顺逆直接输出 `intermediate_role_2`（`MAINSTREAM / COUNTERTREND`），参与四格上下文分类。
 
-- 计算层：`with_flow / against_flow`，判定周线相对月线背景的方向关系
-- 执行层：映射为 `intermediate_role_2`（`MAINSTREAM / COUNTERTREND`），参与四格上下文分类
-
-映射：`with_flow` → `MAINSTREAM`，`against_flow` → `COUNTERTREND`。
+无计算层/执行层之分——周线只有一个判定结果。
 
 ## 2. 定义
 
-`weekly_flow`（代码字段名同名）只回答一个问题：
+`intermediate_role_2` 只回答一个问题：
 
 > 当前周线运动，相对月线背景，是顺着走还是逆着走？
 
 | 值 | 含义 | 典型场景 |
 |-----|------|----------|
-| `with_flow` | 顺流 | 牛市中向上推进；熊市中向下下行 |
-| `against_flow` | 逆流 | 牛市中向下回调；熊市中向上反弹 |
+| `MAINSTREAM` | 顺流 | 牛市中向上推进；熊市中向下下行 |
+| `COUNTERTREND` | 逆流 | 牛市中向下回调；熊市中向上反弹 |
 
 ## 3. 判定规则
 
@@ -34,12 +31,12 @@
 
 | 月线背景 | 周线斜率 | 判定结果 |
 |----------|----------|----------|
-| `BULL_*` | `slope > 0` | `with_flow` |
-| `BULL_*` | `slope ≤ 0` | `against_flow` |
-| `BEAR_*` | `slope ≤ 0` | `with_flow` |
-| `BEAR_*` | `slope > 0` | `against_flow` |
+| `BULL` | `slope > 0` | `MAINSTREAM` |
+| `BULL` | `slope ≤ 0` | `COUNTERTREND` |
+| `BEAR` | `slope ≤ 0` | `MAINSTREAM` |
+| `BEAR` | `slope > 0` | `COUNTERTREND` |
 
-边界处理：无数据或不足 2 根周 K 时，按月线方向给默认值（`BULL_*` → `with_flow`，`BEAR_*` → `against_flow`）。
+边界处理：无数据或不足 2 根周 K 时，按月线方向给默认值（`BULL` → `MAINSTREAM`，`BEAR` → `COUNTERTREND`）。
 
 ## 4. 周线强度（辅助字段）
 
@@ -54,3 +51,9 @@
 - `src/lq/malf/weekly.py` → `classify_weekly_flow()`
 - `src/lq/malf/weekly.py` → `compute_weekly_strength()`
 - `src/lq/malf/contracts.py` → 常量与别名定义
+
+## 6. 历史化说明
+
+- `weekly_flow` / `weekly_flow_relation_to_monthly` 允许继续保留为计算层命名或兼容别名。
+- 但本系统当前正式执行口径中，周线只对外输出 `intermediate_role_2`（`MAINSTREAM / COUNTERTREND`）。
+- 放弃旧命名作为正式输出的原因是：下游真正需要的是“中级波段相对长期背景的顺逆角色”，而不是历史命名本身。

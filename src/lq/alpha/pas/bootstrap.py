@@ -65,7 +65,25 @@ RESEARCH_LAB_SCHEMA_STATEMENTS = [
         code                VARCHAR NOT NULL,
         signal_date         DATE    NOT NULL,
         pattern             VARCHAR NOT NULL,       -- BOF / PB / BPB / TST / CPB
+        long_background_2   VARCHAR,
+        intermediate_role_2 VARCHAR,
         malf_context_4      VARCHAR NOT NULL,       -- BULL_MAINSTREAM / BULL_COUNTERTREND / ...
+        amplitude_rank_low  INTEGER,
+        amplitude_rank_high INTEGER,
+        amplitude_rank_total INTEGER,
+        duration_rank_low   INTEGER,
+        duration_rank_high  INTEGER,
+        duration_rank_total INTEGER,
+        new_price_rank_low  INTEGER,
+        new_price_rank_high INTEGER,
+        new_price_rank_total INTEGER,
+        lifecycle_rank_low  INTEGER,
+        lifecycle_rank_high INTEGER,
+        lifecycle_rank_total INTEGER,
+        amplitude_quartile  VARCHAR,
+        duration_quartile   VARCHAR,
+        new_price_quartile  VARCHAR,
+        lifecycle_quartile  VARCHAR,
         strength            DOUBLE  NOT NULL,
         signal_low          DOUBLE  NOT NULL,       -- 信号最低价（止损参考）
         entry_ref_price     DOUBLE  NOT NULL,       -- 参考入场价
@@ -128,6 +146,28 @@ RESEARCH_LAB_SCHEMA_STATEMENTS = [
 ]
 
 
+PAS_FORMAL_SIGNAL_MIGRATIONS = [
+    "ALTER TABLE pas_formal_signal ADD COLUMN IF NOT EXISTS long_background_2 VARCHAR",
+    "ALTER TABLE pas_formal_signal ADD COLUMN IF NOT EXISTS intermediate_role_2 VARCHAR",
+    "ALTER TABLE pas_formal_signal ADD COLUMN IF NOT EXISTS amplitude_rank_low INTEGER",
+    "ALTER TABLE pas_formal_signal ADD COLUMN IF NOT EXISTS amplitude_rank_high INTEGER",
+    "ALTER TABLE pas_formal_signal ADD COLUMN IF NOT EXISTS amplitude_rank_total INTEGER",
+    "ALTER TABLE pas_formal_signal ADD COLUMN IF NOT EXISTS duration_rank_low INTEGER",
+    "ALTER TABLE pas_formal_signal ADD COLUMN IF NOT EXISTS duration_rank_high INTEGER",
+    "ALTER TABLE pas_formal_signal ADD COLUMN IF NOT EXISTS duration_rank_total INTEGER",
+    "ALTER TABLE pas_formal_signal ADD COLUMN IF NOT EXISTS new_price_rank_low INTEGER",
+    "ALTER TABLE pas_formal_signal ADD COLUMN IF NOT EXISTS new_price_rank_high INTEGER",
+    "ALTER TABLE pas_formal_signal ADD COLUMN IF NOT EXISTS new_price_rank_total INTEGER",
+    "ALTER TABLE pas_formal_signal ADD COLUMN IF NOT EXISTS lifecycle_rank_low INTEGER",
+    "ALTER TABLE pas_formal_signal ADD COLUMN IF NOT EXISTS lifecycle_rank_high INTEGER",
+    "ALTER TABLE pas_formal_signal ADD COLUMN IF NOT EXISTS lifecycle_rank_total INTEGER",
+    "ALTER TABLE pas_formal_signal ADD COLUMN IF NOT EXISTS amplitude_quartile VARCHAR",
+    "ALTER TABLE pas_formal_signal ADD COLUMN IF NOT EXISTS duration_quartile VARCHAR",
+    "ALTER TABLE pas_formal_signal ADD COLUMN IF NOT EXISTS new_price_quartile VARCHAR",
+    "ALTER TABLE pas_formal_signal ADD COLUMN IF NOT EXISTS lifecycle_quartile VARCHAR",
+]
+
+
 def bootstrap_research_lab(research_lab_path: Path) -> None:
     """初始化 research_lab.duckdb schema。
 
@@ -138,3 +178,8 @@ def bootstrap_research_lab(research_lab_path: Path) -> None:
     with duckdb.connect(str(research_lab_path)) as conn:
         for stmt in RESEARCH_LAB_SCHEMA_STATEMENTS:
             conn.execute(stmt)
+        for stmt in PAS_FORMAL_SIGNAL_MIGRATIONS:
+            try:
+                conn.execute(stmt)
+            except Exception:
+                pass

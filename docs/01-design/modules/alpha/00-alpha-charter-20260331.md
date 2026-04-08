@@ -23,23 +23,23 @@
 
 | Trigger | 地位 | 有效准入格 | 父系统结论卡 |
 |---|---|---|---|
-| `BOF` | **core / primary_trend_driver** | persisting 四格为主力（non-sparse 集中于 BULL/BEAR_PERSISTING × MAINSTREAM/COUNTERTREND） | 93 |
-| `PB` | **conditional / conditional_assist_driver** | `BULL_PERSISTING + with_flow`，`BEAR_PERSISTING + against_flow` | 110, 121 |
-| `TST` | **conditional / conditional_assist_driver** | `BULL_PERSISTING + with_flow`，`BEAR_PERSISTING + against_flow` | 126 ✅ |
+| `BOF` | **core / primary_trend_driver** | 当前主线 trigger；正式背景口径以 `malf_context_4` 为准 | 93 |
+| `PB` | **conditional / conditional_assist_driver** | 条件研究路径；背景判断已转向 `long_background_2 / intermediate_role_2 / malf_context_4`，并保留 `pb_sequence_number` | 110, 121 |
+| `TST` | **conditional / conditional_assist_driver** | 条件研究路径；不扩展为全市场主线 | 126 ✅ |
 | `CPB` | **excluded / rejected**（保留段负收益） | —（三段回测未证明正收益，system 层禁止调用） | 129, 258 |
 | `BPB` | **excluded / not_for_long_alpha** | — | 93, 131 |
 
 **说明：**
 - TST 已完成父系统三年独立验证，三段回测确认为辅策略（CONDITIONAL）。
 - CPB 三段回测保留段负收益（-33万），降为 REJECTED，system 层禁止调用。
-- 条件格准入：必须同时满足 `monthly_state ∈ {BULL_PERSISTING, BEAR_PERSISTING}` + 正确 `weekly_flow`，才允许进入主线。
+- 条件格准入的当前正式描述，应优先写为 `long_background_2 / intermediate_role_2 / malf_context_4`；`monthly_state / weekly_flow` 仅作为兼容细粒度背景保留。
 - BPB 永久禁止进入主线，无论测试结果如何。
 - 价格口径：信号层以 `backward-adjusted` 为准（研究层合同），尚未对齐 raw-execution 口径（父系统 130 号卡边界说明）。
 
 ## 4. 正式输入
 
 1. 日线 `DataFrame`（来自 `market_base.duckdb`，已通过 `filter` 模块的不利条件检查）
-2. `MalfContext`（来自 `malf` 模块，三层主轴快照）
+2. `MalfContext`（来自 `malf` 模块；正式主字段为 `long_background_2 / intermediate_role_2 / malf_context_4`，兼容保留 `monthly_state / weekly_flow`）
 3. `StructureSnapshot`（来自 `structure` 模块，结构位识别结果）
 
 **必须先经过 `filter` 模块的不利条件过滤，才能进入 trigger 探测。**
@@ -50,7 +50,7 @@
 |---|---|---|
 | `PasSignal` | `dataclass`（冻结合同） | 落入 `research_lab.duckdb`（L3） |
 
-`PasSignal` 是本模块对外唯一正式合同。包含信号日期、trigger 类型、MALF 表面标签、第一 PB 序号等。
+`PasSignal` 是本模块对外唯一正式合同。包含信号日期、trigger 类型、`malf_context_4`、生命周期字段与第一 PB 序号等。
 
 ## 6. 与父系统的核心差异
 

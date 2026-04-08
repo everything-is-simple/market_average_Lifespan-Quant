@@ -31,6 +31,8 @@ class TestStockScanTraceContract:
             run_id="scan-2024-06-03-abc",
             code="000001.SZ",
             signal_date=date(2024, 6, 3),
+            long_background_2="BULL",
+            intermediate_role_2="MAINSTREAM",
             monthly_state="BULL_PERSISTING",
             malf_context_4="BULL_MAINSTREAM",
             tradeable=tradeable,
@@ -58,7 +60,8 @@ class TestStockScanTraceContract:
         """as_dict() 应输出全部必要字段（含 P1-04 新增 structure_summary）。"""
         trace = self._make_trace(tradeable=True)
         d = trace.as_dict()
-        for key in ("run_id", "code", "signal_date", "monthly_state",
+        for key in ("run_id", "code", "signal_date", "long_background_2",
+                    "intermediate_role_2", "monthly_state",
                     "malf_context_4", "tradeable", "adverse_conditions",
                     "adverse_notes", "structure_summary", "pas_traces"):
             assert key in d, f"as_dict() 缺少字段 {key}"
@@ -100,6 +103,7 @@ class TestStructureSummaryInExplainChain:
         """tradeable=True 的解释链应携带 structure_summary 字段。"""
         trace = StockScanTrace(
             run_id="r1", code="000001.SZ", signal_date=date(2024, 6, 3),
+            long_background_2="BULL", intermediate_role_2="MAINSTREAM",
             monthly_state="BULL_PERSISTING", malf_context_4="BULL_MAINSTREAM",
             tradeable=True, adverse_conditions=(), adverse_notes="",
             structure_summary={"has_clear_structure": False},
@@ -112,6 +116,7 @@ class TestStructureSummaryInExplainChain:
         """tradeable=False 的解释链也应携带 structure_summary（复盘用）。"""
         trace = StockScanTrace(
             run_id="r2", code="000002.SZ", signal_date=date(2024, 6, 3),
+            long_background_2="BEAR", intermediate_role_2="MAINSTREAM",
             monthly_state="BEAR_PERSISTING", malf_context_4="BEAR_MAINSTREAM",
             tradeable=False, adverse_conditions=("BACKGROUND_NOT_SUPPORTING",),
             adverse_notes="月线背景不支持",

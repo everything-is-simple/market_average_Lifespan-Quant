@@ -27,7 +27,7 @@
 
 ### 1.3 从父系统（MarketLifespan-Quant）继承的合同
 
-1. **5 张研究表**：`position_run / position_policy_registry / position_sizing_snapshot / position_exit_plan / position_exit_leg`（全部落入 `research_lab.duckdb`）
+1. **5 张研究表口径**：`position_run / position_policy_registry / position_sizing_snapshot / position_exit_plan / position_exit_leg` 仍是从父系统继承的目标态 research schema，但当前仓库尚未独立实现 position 的 bootstrap / pipeline / 落库写入
 2. **Position 状态机**：`OPEN → PARTIAL_EXIT_PENDING → OPEN_REDUCED → FULL_EXIT_PENDING → CLOSED`
 3. **v1 partial-exit 契约**：多腿 SELL 订单，stop-loss / force-close 永远是硬全平，不进 partial-exit 路径
 4. **入场执行语义**：`signal_date = T`，`execute_date = T+1`，成交价 = T+1 开盘价
@@ -40,7 +40,7 @@
 `position` 是仓位与退出研究模块。
 
 **一句话定位**：  
-`把冻结后的 PasSignal 转化为可验证的仓位规划与退出合同，输出到 research_lab，为 trade 主线提供可桥接迁移的持仓治理结果。`
+`把冻结后的 PasSignal 转化为可验证的仓位规划与退出合同；当前已实现合同层与 sizing/exit 计算，独立 research_lab 落库仍待后续 pipeline/bootstrap 补齐。`
 
 本模块**不是交易账户**，输出的是研究层合同对象，经桥接后才进入正式交易运行态。
 
@@ -48,15 +48,21 @@
 
 ## 3. 正式输入
 
-1. `PasSignal`（来自 `alpha/pas` 模块，已冻结后的正式 run）
-2. `market_base.stock_daily_adjusted`（T+1 reference price 查询）
-3. `MalfContext`（可选，用于 surface_label 背景感知；当前不参与 sizing 决策）
+1. `PasSignal`（来自 `alpha/pas` 模块，已冻结后的正式 run；可携带 `execution_context_snapshot` 的正式生命周期字段）
+2. 交易日历辅助（用于 `next_trading_day(signal_date)` 计算 `entry_date`）
+3. 调用方传入的 `entry_price`（通常按 `T+1` 开盘价语义提供；当前 `market_base` 查询发生在调用方如 `trade`，不是 `position` 自身）
+4. `MalfContext`（可选，兼容追溯；当前不参与 sizing 决策）
+
+当前约束：
+
+1. `position` 可以接收 `PasSignal` 中的正式生命周期字段，但当前 sizing 公式不得因这些字段而改变。
+2. 正式生命周期字段在本阶段的作用是为后续 sizing 升级预留合同，而不是立即引入权重调节。
 
 ---
 
 ## 4. 正式输出
 
-### 4.1 落盘输出（research_lab.duckdb）
+### 4.1 目标态落盘输出（research_lab.duckdb，当前尚未独立实现）
 
 | 表名 | 内容 |
 |---|---|
@@ -66,12 +72,14 @@
 | `position_exit_plan` | 每笔信号的完整退出计划合同 |
 | `position_exit_leg` | 每个退出计划的各腿明细 |
 
-### 4.2 对外合同（传递给 trade 模块）
+当前代码中已实现的是 `PositionPlan / PositionExitPlan` 合同与对应计算函数；上表所述独立 research schema 仍属于待补齐目标态，不得在其他正式文档中表述为“已经落地现状”。
+
+### 4.2 当前已实现的对外合同（传递给 trade 模块）
 
 | 合同 | 类型 | 传递时机 |
 |---|---|---|
 | `PositionPlan` | `dataclass`（冻结） | 经桥接进入 trade |
-| `PositionExitPlan` | `dataclass`（冻结） | 经桥接进入 trade |
+| `PositionExitPlan` | `dataclass`（冻结） | 当前已实现合同与生成函数，但尚未核实为 trade 主线直接消费入口 |
 
 ---
 
@@ -104,7 +112,7 @@
 2. **强制平仓（FORCE_CLOSE）= 硬全平**，立即清空 remaining_quantity
 3. **v1 partial-exit = 多腿 SELL 订单**（每腿一张 SELL，单腿单次撮合）
 4. **第一腿止盈**：入场 + 1R，卖出 half_lot（A 股整手约束向下取整）
-5. **runner 腿**：剩余仓位跟踪止损；从持仓最高点回撤 `trailing_pct` 触发
+5. **runner 腿**：`position` 当前只产出 runner 腿合同与初始 `trailing_stop_trigger` 占位值；真正基于持仓最高价动态上移的跟踪止损由 `trade.management` 在运行期管理
 
 ---
 
@@ -114,7 +122,7 @@
 
 1. `PositionPlan` bootstrap（1R 仓位计算 + A 股整手约束）
 2. `PositionExitPlan` 构建（第一腿止盈 + runner 跟踪止损 + 时间止损）
-3. position 研究样本与 run 元数据写入 `research_lab`
+3. 冻结 position research schema 与写权边界，但当前不把“已独立写入 `research_lab`”冒充为完成事实
 4. sizing 家族注册与 baseline 管理
 5. partial-exit 合同冻结（`position_exit_plan / position_exit_leg`）
 
@@ -133,7 +141,7 @@
 1. **1R 基准**：`risk_unit = entry_price − initial_stop`；`risk_unit > 0` 必须满足；若 `≤ 0` 则退化为 `entry_price × 0.005`
 2. **T+1 开盘执行**：`entry_date = next_trading_day(signal_date)`，成交价 = T+1 开盘价
 3. **A 股整手**：`target_shares = floor(raw / lot_size) * lot_size`，最小结果不满一手则取 `lot_size`
-4. **研究层写权**：`position` 只写 `research_lab` 中属于自己的 5 张表，禁止写 `market_base / malf / trade_runtime`
+4. **研究层写权边界**：若后续补 position 独立落库，其写权只能落在 `research_lab` 中属于 position 的 5 张表；在当前未实现独立 pipeline 之前，禁止把目标态写权表述成“已落地现状”
 5. **no MSS / no IRS 铁律**：sizing 决策不引入 MALF surface label、MSS 市场情绪层、IRS 行业层作为权重调节
 6. **桥接才进 trade**：`PositionPlan / PositionExitPlan` 必须经过 `trade` 模块桥接，不能直接接管交易执行
 
@@ -143,9 +151,9 @@
 
 1. `PositionPlan` 合同冻结，1R 计算逻辑有测试覆盖（含负 risk_unit 退化情形）
 2. `PositionExitPlan` 合同冻结，两腿结构（first_target + runner）有明确字段
-3. `research_lab` 的 5 张 position 表已 bootstrap，可追溯到来源 `PasSignal` run
+3. 当前最小完成标准不要求 position 独立 research schema 已落库；若后续补齐 bootstrap / pipeline，必须另开卡并同步升级本文档
 4. sizing 家族注册表已定义，`FIXED_NOTIONAL_CONTROL + SINGLE_LOT_CONTROL` 基线对可运行
-5. partial-exit 退出计划可生成 `position_exit_plan + position_exit_leg` 记录
+5. partial-exit 退出计划当前至少可生成 `PositionExitPlan` 合同对象；独立 `position_exit_plan + position_exit_leg` 落库仍属待补目标态
 6. 只有经过桥接迁移，`position` 结果才进入 `trade_runtime`
 
 ---

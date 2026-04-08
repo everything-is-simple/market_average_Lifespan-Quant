@@ -22,8 +22,8 @@
 4. 父系统 `core` 只有 4 个 workspace 根（无 `validated_root`），本系统增加第 5 个
 
 **本系统当前实现（v0.1.0）：**
-1. `contracts.py`：4 组枚举（背景层 / PAS 触发层 / 结构位层 / 交易管理层）+ 5 类常量，**已完成**
-2. `paths.py`：WorkspaceRoots（5 根）+ DatabasePaths（**7 库**）+ `default_settings()` + `tdx_root()` + `tushare_token_path()`，**已完成**
+1. `contracts.py`：4 组枚举（其中 `MonthlyState8 / WeeklyFlowRelation` 为计算层诊断与兼容字段，`MalfContext4` 为执行层主轴）+ 5 类常量，**已完成**
+2. `paths.py`：WorkspaceRoots（5 根）+ DatabasePaths（**7 库**）+ `default_settings()` + `tdx_root()` + `tdx_offline_data_root()` + `tushare_token_path()`，**已完成**
 3. `calendar.py`：A 股最小交易日历（`is_trading_day` / `next_trading_day`，2024-2027 节假日硬编码），**已完成**
 4. `checkpoint.py`：`JsonCheckpointStore` 长任务 checkpoint 存储，**已完成（2026-04-02）**
 5. `resumable.py`：6 个续跑 helper（`stable_json_dumps / build_resume_digest / resolve_default_checkpoint_path / prepare_resumable_checkpoint / save_resumable_checkpoint / parse_optional_date`），**已完成（2026-04-02）**
@@ -64,10 +64,10 @@ core/
 
 ### 3.1 负责
 
-1. **枚举与类型**：跨模块共用的枚举（背景层 / PAS / 结构位 / 交易管理）
+1. **枚举与类型**：跨模块共用的枚举（背景层 / PAS / 结构位 / 交易管理）；其中 `MalfContext4` 是当前 `MALF` 执行层主轴，`MonthlyState8 / WeeklyFlowRelation` 保留为计算层诊断与兼容字段
 2. **业务常量**：A 股交易费率、默认资金参数、指数代码、LOT_SIZE
 3. **路径合同**：WorkspaceRoots（5 目录）、DatabasePaths（**7 数据库**：raw_market / market_base / malf / structure / filter / research_lab / trade_runtime）
-4. **路径解析**：`default_settings()`、`discover_repo_root()`、`tdx_root()`、`tushare_token_path()`
+4. **路径解析**：`default_settings()`、`discover_repo_root()`、`tdx_root()`、`tdx_offline_data_root()`、`tushare_token_path()`
 5. **PAS 治理状态**：`PAS_TRIGGER_STATUS` 字典（冻结当前每个触发器的治理状态）
 6. **交易日历**：`is_trading_day()`、`next_trading_day()`（A 股节假日，2024-2027）
 7. **Checkpoint 存储**：`JsonCheckpointStore`（长任务 JSON checkpoint 文件的 load/save/update/clear）
@@ -97,7 +97,7 @@ data / malf / structure / filter / alpha / position / trade / system
 | 模块 | 从 core 消费的内容 |
 |---|---|
 | data | DatabasePaths, WorkspaceRoots, default_settings |
-| malf | MonthlyState8, WeeklyFlowRelation, SurfaceLabel, DatabasePaths |
+| malf | MonthlyState8, WeeklyFlowRelation, MalfContext4, DatabasePaths |
 | structure | StructureLevelType, BreakoutType, WorkspaceRoots |
 | filter | AdverseConditionType, WorkspaceRoots |
 | alpha | PasTriggerPattern, PasTriggerStatus, PAS_TRIGGER_STATUS |
@@ -124,7 +124,7 @@ data / malf / structure / filter / alpha / position / trade / system
 2. `paths.py` 能在 Windows / Linux 环境下均正确解析 5 个工作区根目录
 3. `core` 本身可独立 `import`，无需安装任何第三方库
 4. 所有模块均通过 `from lq.core.contracts import ...` 引用枚举，无魔法字符串散落
-5. `default_settings()` 在 env var 缺失时使用约定目录名（`Lifespan-data` 等）
+5. `default_settings()` 在 env var 缺失时使用约定目录名（`Lifespan-Quant-data` / `Lifespan-temp` / `Lifespan-Quant-report` / `Lifespan-Quant-Validated`）
 
 ---
 

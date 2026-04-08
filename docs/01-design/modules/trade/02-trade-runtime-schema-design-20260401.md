@@ -373,7 +373,7 @@ def bootstrap_trade_runtime(database_path: Path | None = None) -> Path:
 | 表 | 状态 | 说明 |
 |---|---|---|
 | `trade_record` | ✅ 已实现 | 简化版：无 FK、无 signal_id/entry_notional/entry_cost/exit_cost/gross_pnl/net_pnl/hold_days/first_target_hit 列 |
-| `trade_run_summary` | ✅ 已实现 | 回测 run 汇总（对应设计 `backtest_summary` 的简化版） |
+| `trade_run_summary` | ⚠️ schema 已定义 | 回测 run 汇总（对应设计 `backtest_summary` 的简化版）；当前仅确认表存在，尚未在 `run_trade_build()` 中核实实际写入 |
 | `trade_build_manifest` | ✅ 已实现 | 构建元数据 |
 | `trade_run` | ⏳ 待实现 | Broker/BacktestEngine 完成后补 |
 | `order_event` | ⏳ 待实现 | 需要 Broker 订单系统 |

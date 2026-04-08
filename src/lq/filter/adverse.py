@@ -149,25 +149,28 @@ def _check_insufficient_space(
 def _check_background_not_supporting(malf_ctx: MalfContext | None) -> bool:
     """A4-5: 检测市场背景不支持做多。
 
-    返回 True 表示触发了不利条件。
-    """
+     返回 True 表示触发了不利条件。
+     """
     if malf_ctx is None:
+        return False
+ 
+    if malf_ctx.long_background_2 != "BEAR":
         return False
 
     monthly = malf_ctx.monthly_state
-
+ 
     # 熊市持续阶段屏蔽
     if BEAR_PERSISTING_BLOCK and monthly == "BEAR_PERSISTING":
         return True
-
+ 
     # 熊市形成阶段（可选屏蔽）：BEAR_FORMING_BLOCK=True 时才屏蔽
     if BEAR_FORMING_BLOCK and monthly == "BEAR_FORMING":
         return True
-
+ 
     # 熊市高位逆势反弹背景下（逆流反弹），也屏蔽做多
-    if monthly == "BEAR_PERSISTING" and malf_ctx.weekly_flow == "against_flow":
+    if monthly == "BEAR_PERSISTING" and malf_ctx.intermediate_role_2 == "COUNTERTREND":
         return True
-
+ 
     return False
 
 

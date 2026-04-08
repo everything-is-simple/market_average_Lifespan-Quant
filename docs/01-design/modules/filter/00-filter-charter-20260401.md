@@ -26,11 +26,11 @@ data → malf → structure → [ filter ] → alpha/pas → position → trade 
 ```
 
 `filter` 是主线链路的**第四层**（在 structure 之后、alpha/pas 之前）：
-
-- 消费 `structure` 的输出：`nearest_support_price / nearest_resistance_price`（空间检查）
-- 消费 `malf` 的输出：`MalfContext`（背景检查）
-- 消费日线数据：直接接收 DataFrame（振幅检查、方向检查）
-- 输出 `AdverseConditionResult` → `system` 层判断 `tradeable` 决定是否进入 trigger 探测
+ 
+ - 消费 `structure` 的输出：`nearest_support_price / nearest_resistance_price`（空间检查）
+ - 消费 `malf` 的输出：`MalfContext`（背景检查；正式摘要使用 `long_background_2 / intermediate_role_2 / malf_context_4`，旧 `monthly_state / weekly_flow` 仅保留兼容细粒度）
+ - 消费日线数据：直接接收 DataFrame（振幅检查、方向检查）
+ - 输出 `AdverseConditionResult` → `system` 层判断 `tradeable` 决定是否进入 trigger 探测
 
 ### 1.3 设计理念：过滤器不是信号生成器
 
@@ -151,7 +151,7 @@ from lq.malf.contracts import MalfContext
 ### 6.3 pipeline 实现
 
 - `filter/pipeline.py` — `run_filter_build()` 按日期逐日处理，每日内按 `batch_size` 分批处理股票
-- 依赖 `malf.duckdb`（读 surface_label）和 `structure.duckdb`（读最近支撑/阻力价）
+- 依赖 `malf.duckdb`（当前从 `malf_context_snapshot` 读取 `long_background_2 / intermediate_role_2 / malf_context_4` 正式摘要，并兼容读取 `monthly_state / weekly_flow`）和 `structure.duckdb`（读最近支撑/阻力价）
 - 每批完成立即写入 `filter.duckdb`（先删后插，幂等）
 - 每个日期完成后保存 JSON checkpoint（`core.resumable`）
 - `bootstrap_filter_storage()` 初始化 schema（幂等）
@@ -161,7 +161,7 @@ from lq.malf.contracts import MalfContext
 ## 7. 铁律
 
 1. **filter 拥有 `filter.duckdb`**：不利条件结果按日按股增量追加，历史一旦计算绝不重算
-2. **增量更新**：只处理新日期，每行带 `config_hash`，参数冻结则跳过已有数据
+2. **增量更新**：只处理新日期；`config_hash` 是全局设计纪律，但是否已在当前 `filter_snapshot` schema 全量落地，必须以实际 pipeline 与 schema 为准
 3. **每条件独立**：每个 `_check_xxx()` 函数必须独立返回 bool，不允许相互依赖
 3. **任一触发即 False**：`tradeable = (active_conditions == [])` ——OR 关系触发，AND 关系通过
 4. **不判断信号有效性**：filter 只说"状态不对"，不说"没有信号"；`tradeable=False` 不等于市场无机会
@@ -172,12 +172,12 @@ from lq.malf.contracts import MalfContext
 
 ## 7. 成功标准
 
-1. `check_adverse_conditions()` 对任意股票日线数据不报错，返回有效 `AdverseConditionResult`
-2. `malf_ctx=None` 时，A4-5 背景检查自动跳过（不报错）
-3. `nearest_support_price=None` 时，A4-3 空间检查自动跳过（不报错）
-4. `daily_bars` 为空 DataFrame 时，A4-1/A4-2 自动跳过（不报错）
-5. BEAR_PERSISTING 月线背景下，`tradeable=False`，`active_conditions` 包含 `BACKGROUND_NOT_SUPPORTING`
-6. 振幅压缩且均线走平时，`active_conditions` 包含 `COMPRESSION_NO_DIRECTION`
+ 1. `check_adverse_conditions()` 对任意股票日线数据不报错，返回有效 `AdverseConditionResult`
+ 2. `malf_ctx=None` 时，A4-5 背景检查自动跳过（不报错）
+ 3. `nearest_support_price=None` 时，A4-3 空间检查自动跳过（不报错）
+ 4. `daily_bars` 为空 DataFrame 时，A4-1/A4-2 自动跳过（不报错）
+ 5. `long_background_2="BEAR"` 且兼容细粒度命中 `BEAR_PERSISTING` 时，`tradeable=False`，`active_conditions` 包含 `BACKGROUND_NOT_SUPPORTING`
+ 6. 振幅压缩且均线走平时，`active_conditions` 包含 `COMPRESSION_NO_DIRECTION`
 
 ---
 

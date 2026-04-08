@@ -77,9 +77,9 @@ data → malf → structure → filter → alpha/pas → position → trade → 
 
 ### 3.2 malf
 
-- 职责：三层主轴计算（monthly_state_8 / weekly_flow_relation / surface_label）
-- 输入：`market_base.duckdb`（月线、周线）
-- 输出：`MalfContext` 合同对象、`malf.duckdb`（L3）
+- 职责：四格上下文与生命周期三轴排位计算，并物化 `execution_context_snapshot`
+- 输入：`market_base.duckdb`（月线、周线、日线聚合结果）
+- 输出：`MalfContext` 合同对象、`execution_context_snapshot` 桥表、`malf.duckdb`（L3）
 
 ### 3.3 structure（新增）
 
@@ -91,14 +91,14 @@ data → malf → structure → filter → alpha/pas → position → trade → 
 ### 3.4 filter（新增）
 
 - 职责：不利市场条件过滤，"不做"语言正式化（5 类 adverse conditions）
-- 输入：日线数据 + `MalfContext` + 最近支撑/阻力价格（float）
+- 输入：日线数据 + `MalfContext`（正式主字段为 `long_background_2 / intermediate_role_2 / malf_context_4`，`monthly_state / weekly_flow` 仅兼容保留）+ 最近支撑/阻力价格（float）
 - 输出：`AdverseConditionResult`，落入 `filter.duckdb`（L3，按日按股增量追加）
 - 依赖：`core` + `malf`（新增 duckdb 写入职责）
 
 ### 3.5 alpha/pas
 
-- 职责：五 trigger 探测（BOF/BPB/PB/TST/CPB）、16 格验证框架、第一 PB 追踪
-- 输入：日线数据（通过过滤器的股票）+ `StructureSnapshot`
+- 职责：五 trigger 探测、正式信号落库、第一 PB 追踪；当前 system 主线仅允许 BOF，PB/TST 为条件准入，BPB/CPB 为 rejected
+- 输入：通过过滤器的日线数据 + `StructureSnapshot` + `execution_context_snapshot` 所承载的 MALF 正式字段
 - 输出：`PasSignal` 列表，落入 `research_lab.duckdb`（L3，持久化，按信号增量追加）
 
 ### 3.6 position

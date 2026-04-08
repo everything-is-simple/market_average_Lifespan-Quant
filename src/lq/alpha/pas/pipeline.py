@@ -2,7 +2,7 @@
 
 入口函数 run_pas_batch()：
   1. 从 market_base.duckdb 读取候选股后复权日线
-  2. 从 malf.duckdb 读取 malf_context_snapshot（获取 malf_context_4）
+  2. 从 malf.duckdb 读取 execution_context_snapshot（获取正式生命周期字段）
   3. 对每只股票运行 run_all_detectors()
   4. 对触发信号执行 cell_gate_check()（准入校验）
   5. 将 trace + signal 写入 research_lab.duckdb
@@ -45,6 +45,33 @@ _MIN_HISTORY_DAYS = 60
 _REJECTED_PATTERNS = {PasTriggerPattern.BPB.value}
 
 
+def _empty_malf_snapshot() -> dict[str, object]:
+    """返回缺省 MALF 快照占位。"""
+    return {
+        "long_background_2": None,
+        "intermediate_role_2": None,
+        "malf_context_4": "UNKNOWN",
+        "amplitude_rank_low": None,
+        "amplitude_rank_high": None,
+        "amplitude_rank_total": None,
+        "duration_rank_low": None,
+        "duration_rank_high": None,
+        "duration_rank_total": None,
+        "new_price_rank_low": None,
+        "new_price_rank_high": None,
+        "new_price_rank_total": None,
+        "lifecycle_rank_low": None,
+        "lifecycle_rank_high": None,
+        "lifecycle_rank_total": None,
+        "amplitude_quartile": None,
+        "duration_quartile": None,
+        "new_price_quartile": None,
+        "lifecycle_quartile": None,
+        "monthly_state": "",
+        "weekly_flow": "",
+    }
+
+
 def run_pas_batch(
     signal_date: date,
     codes: Sequence[str],
@@ -79,18 +106,52 @@ def run_pas_batch(
     all_signals: list[PasSignal] = []
     pattern_counts: dict[str, int] = {p: 0 for p in active_patterns}
 
-    # 读取所有候选股的 malf_context_4（来自 malf）
-    malf_labels: dict[str, str] = {}
+    # 读取所有候选股的 MALF 快照（正式字段来自 execution_context_snapshot；gate 兼容字段来自 malf_context_snapshot）
+    malf_snapshots: dict[str, dict[str, object]] = {}
     try:
         with duckdb.connect(str(malf_db_path), read_only=True) as malf_conn:
             rows = malf_conn.execute(
-                "SELECT code, malf_context_4 FROM malf_context_snapshot "
-                "WHERE signal_date = ? AND code = ANY(?)",
+                "SELECT e.entity_code, e.long_background_2, e.intermediate_role_2, e.malf_context_4, "
+                "       e.amplitude_rank_low, e.amplitude_rank_high, e.amplitude_rank_total, "
+                "       e.duration_rank_low, e.duration_rank_high, e.duration_rank_total, "
+                "       e.new_price_rank_low, e.new_price_rank_high, e.new_price_rank_total, "
+                "       e.lifecycle_rank_low, e.lifecycle_rank_high, e.lifecycle_rank_total, "
+                "       e.amplitude_quartile, e.duration_quartile, e.new_price_quartile, e.lifecycle_quartile, "
+                "       COALESCE(m.monthly_state, ''), COALESCE(m.weekly_flow, '') "
+                "FROM execution_context_snapshot e "
+                "LEFT JOIN malf_context_snapshot m "
+                "  ON m.code = e.entity_code AND m.signal_date = e.calc_date "
+                "WHERE e.entity_scope = 'stock' AND e.calc_date = ? AND e.entity_code = ANY(?)",
                 [signal_date, list(codes)],
             ).fetchall()
-            malf_labels = {r[0]: r[1] for r in rows}
+            malf_snapshots = {
+                r[0]: {
+                    "long_background_2": r[1],
+                    "intermediate_role_2": r[2],
+                    "malf_context_4": r[3] or "UNKNOWN",
+                    "amplitude_rank_low": r[4],
+                    "amplitude_rank_high": r[5],
+                    "amplitude_rank_total": r[6],
+                    "duration_rank_low": r[7],
+                    "duration_rank_high": r[8],
+                    "duration_rank_total": r[9],
+                    "new_price_rank_low": r[10],
+                    "new_price_rank_high": r[11],
+                    "new_price_rank_total": r[12],
+                    "lifecycle_rank_low": r[13],
+                    "lifecycle_rank_high": r[14],
+                    "lifecycle_rank_total": r[15],
+                    "amplitude_quartile": r[16],
+                    "duration_quartile": r[17],
+                    "new_price_quartile": r[18],
+                    "lifecycle_quartile": r[19],
+                    "monthly_state": r[20] or "",
+                    "weekly_flow": r[21] or "",
+                }
+                for r in rows
+            }
     except Exception:
-        pass  # malf 数据不可用时仍运行探测，signal 中 malf_context_4 置为 "UNKNOWN"
+        pass  # malf 数据不可用时仍运行探测，signal 中正式字段回退到占位
 
     with duckdb.connect(str(market_base_path), read_only=True) as base_conn:
         for i, code in enumerate(codes):
@@ -105,7 +166,9 @@ def run_pas_batch(
                 traces = run_all_detectors(code, signal_date, df, patterns=active_patterns)
                 all_traces.extend(traces)
 
-                ctx4_label = malf_labels.get(code, "UNKNOWN")
+                malf_snapshot = malf_snapshots.get(code, _empty_malf_snapshot())
+                monthly_state = malf_snapshot["monthly_state"]
+                weekly_flow = malf_snapshot["weekly_flow"]
 
                 for trace in traces:
                     if not trace.triggered:
@@ -114,13 +177,13 @@ def run_pas_batch(
                         continue   # BPB 不写正式信号表
 
                     # 准入校验（cell gate）
-                    if ctx4_label != "UNKNOWN":
-                        gate = cell_gate_check(trace.pattern, ctx4_label)
-                        if gate == "rejected":
+                    if monthly_state and weekly_flow:
+                        gate = cell_gate_check(trace.pattern, monthly_state, weekly_flow)
+                        if not gate:
                             continue   # 拒绝格不写信号
 
                     # 构建正式信号
-                    sig = _build_signal(trace, code, signal_date, ctx4_label, df)
+                    sig = _build_signal(trace, code, signal_date, malf_snapshot, df)
                     all_signals.append(sig)
                     pattern_counts[trace.pattern] = pattern_counts.get(trace.pattern, 0) + 1
 
@@ -141,7 +204,7 @@ def run_pas_batch(
     # 写入 research_lab.duckdb
     _write_to_research_lab(
         research_lab_path, run_id, signal_date,
-        active_patterns, len(codes), all_traces, all_signals,
+        active_patterns, len(codes), all_traces, all_signals, malf_snapshots,
     )
 
     if verbose:
@@ -177,7 +240,7 @@ def _build_signal(
     trace: PasDetectTrace,
     code: str,
     signal_date: date,
-    malf_context_4: str,
+    malf_snapshot: dict[str, object],
     df: pd.DataFrame,
 ) -> PasSignal:
     """从 trace 构建 PasSignal（正式信号合同）。"""
@@ -194,7 +257,27 @@ def _build_signal(
         code=code,
         signal_date=signal_date,
         pattern=trace.pattern,
-        malf_context_4=malf_context_4,
+        long_background_2=malf_snapshot.get("long_background_2"),
+        intermediate_role_2=malf_snapshot.get("intermediate_role_2"),
+        malf_context_4=str(malf_snapshot.get("malf_context_4") or "UNKNOWN"),
+        amplitude_rank_low=malf_snapshot.get("amplitude_rank_low"),
+        amplitude_rank_high=malf_snapshot.get("amplitude_rank_high"),
+        amplitude_rank_total=malf_snapshot.get("amplitude_rank_total"),
+        duration_rank_low=malf_snapshot.get("duration_rank_low"),
+        duration_rank_high=malf_snapshot.get("duration_rank_high"),
+        duration_rank_total=malf_snapshot.get("duration_rank_total"),
+        new_price_rank_low=malf_snapshot.get("new_price_rank_low"),
+        new_price_rank_high=malf_snapshot.get("new_price_rank_high"),
+        new_price_rank_total=malf_snapshot.get("new_price_rank_total"),
+        lifecycle_rank_low=malf_snapshot.get("lifecycle_rank_low"),
+        lifecycle_rank_high=malf_snapshot.get("lifecycle_rank_high"),
+        lifecycle_rank_total=malf_snapshot.get("lifecycle_rank_total"),
+        amplitude_quartile=malf_snapshot.get("amplitude_quartile"),
+        duration_quartile=malf_snapshot.get("duration_quartile"),
+        new_price_quartile=malf_snapshot.get("new_price_quartile"),
+        lifecycle_quartile=malf_snapshot.get("lifecycle_quartile"),
+        monthly_state=str(malf_snapshot.get("monthly_state") or "") or None,
+        weekly_flow=str(malf_snapshot.get("weekly_flow") or "") or None,
         strength=trace.strength or 0.0,
         signal_low=round(signal_low, 4),
         entry_ref_price=round(entry_ref_price, 4),
@@ -210,6 +293,7 @@ def _write_to_research_lab(
     candidate_count: int,
     traces: list[PasDetectTrace],
     signals: list[PasSignal],
+    malf_snapshots: dict[str, dict[str, object]],
 ) -> None:
     """将 traces 和 signals 写入 research_lab.duckdb（幂等：先删后插）。"""
     with duckdb.connect(str(research_lab_path)) as conn:
@@ -278,22 +362,45 @@ def _write_to_research_lab(
                     sig.code,
                     sig.signal_date,
                     sig.pattern,
+                    sig.long_background_2,
+                    sig.intermediate_role_2,
                     sig.malf_context_4,
+                    sig.amplitude_rank_low,
+                    sig.amplitude_rank_high,
+                    sig.amplitude_rank_total,
+                    sig.duration_rank_low,
+                    sig.duration_rank_high,
+                    sig.duration_rank_total,
+                    sig.new_price_rank_low,
+                    sig.new_price_rank_high,
+                    sig.new_price_rank_total,
+                    sig.lifecycle_rank_low,
+                    sig.lifecycle_rank_high,
+                    sig.lifecycle_rank_total,
+                    sig.amplitude_quartile,
+                    sig.duration_quartile,
+                    sig.new_price_quartile,
+                    sig.lifecycle_quartile,
                     sig.strength,
                     sig.signal_low,
                     sig.entry_ref_price,
                     sig.pb_sequence_number,
-                    None,  # monthly_state（可后续从 malf 补充）
-                    None,  # weekly_flow
+                    sig.monthly_state,
+                    sig.weekly_flow,
                 ]
                 for sig in signals
             ]
             conn.executemany(
                 "INSERT OR REPLACE INTO pas_formal_signal "
-                "(signal_id, run_id, code, signal_date, pattern, malf_context_4, "
+                "(signal_id, run_id, code, signal_date, pattern, long_background_2, intermediate_role_2, malf_context_4, "
+                " amplitude_rank_low, amplitude_rank_high, amplitude_rank_total, "
+                " duration_rank_low, duration_rank_high, duration_rank_total, "
+                " new_price_rank_low, new_price_rank_high, new_price_rank_total, "
+                " lifecycle_rank_low, lifecycle_rank_high, lifecycle_rank_total, "
+                " amplitude_quartile, duration_quartile, new_price_quartile, lifecycle_quartile, "
                 " strength, signal_low, entry_ref_price, pb_sequence_number, "
                 " monthly_state, weekly_flow) "
-                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 signal_rows,
             )
 

@@ -59,7 +59,7 @@
 
 **新价结构**包含两个维度：
 
-- **次数**：当前波段第几次创新高/新低（牛市计新高，熊市计新低）。
+- **次数**：当前波段第几次创新价（方向跟随中级波段：顺势向上计新高，顺势向下计新低，详见 `04` §4.1）。
 - **间隔**：相邻两次创新价之间的交易日数。间隔放大 = 趋势活力衰竭的早期信号。
 
 这是立花义正「新高日」思想的计算层实现，扩展为同时覆盖新高与新低。
@@ -156,14 +156,14 @@ MALF 的全部职责是一条流水线：
 1. 月线价格结构 → `long_background_2`（BULL / BEAR）
 2. 周线相对月线 → `intermediate_role_2`（MAINSTREAM / COUNTERTREND）
 3. 组合 → `malf_context_4`
-4. 日线新价结构度量（新高/新低次数、间隔）
+4. 三轴度量（波幅/时间/新价结构）
 5. 在同一四格内对历史已完成中级波段排位
 6. 输出 `execution_context_snapshot`
 7. 宽基指数市场背景池计算
 
 **不负责**：数据采集与复权（`data`）、结构位识别（`structure`）、不利条件过滤（`filter`）、PAS 触发器探测（`alpha/pas`）、仓位管理与交易执行（`position / trade`）。
 
-## 9. 铁律
+## 10. 铁律
 
 1. 执行层主读数是 `malf_context_4` + 三轴原始排位 + 四分位。
 2. 三轴排位必须保留原始历史名次区间，不先归一化。
@@ -171,7 +171,20 @@ MALF 的全部职责是一条流水线：
 4. 只有同一标的、同一四格的历史已完成中级波段才是可比样本。
 5. MALF 以 `market_base` 为唯一数据来源。
 
-## 10. 成功标准
+### 10.1 已放弃的旧口径
+
+| 旧口径 / 遗留物 | 当前地位 | 放弃原因 |
+|-----------------|----------|----------|
+| `monthly_state_8` 作为执行主轴 | 降级为诊断 / 兼容字段 | 月线切分过细，会先切碎历史样本，反而遮蔽中级波段寿命统计这个真正主问题 |
+| `weekly_flow` / `weekly_flow_relation_to_monthly` 作为正式输出 | 仅保留计算层 / 兼容别名 | 执行层正式输出统一为 `intermediate_role_2`，避免下游继续依赖旧命名 |
+| “月线 × 周线 × PAS 触发器”的三层矩阵 | 不再代表 `MALF` 正式主设计 | 该矩阵描述的是背景与触发组织方式，不是寿命本体，不能直接回答“当前趋势生命走到哪里了” |
+| 裸 `quartile` / `scene quartile` 作为寿命主读数 | 明确放弃 | 四分位只是压缩表达；`scene quartile` 描述的也不是中级波段生命周期原始排位 |
+
+这些概念仍可保留追溯价值，但任何新的 design / spec / runner / interface 都不得再把它们写成 `MALF` 的正式执行主轴。
+
+当前代码里若仍出现 `monthly_state` / `weekly_flow` / `is_new_high_today` 等命名，视为兼容残留，不代表正式合同已回退。
+
+## 11. 成功标准
 
 1. 四格上下文能正确分类每个标的的当前中级波段。
 2. 三轴原始排位能输出正确的历史名次区间。
@@ -180,13 +193,13 @@ MALF 的全部职责是一条流水线：
 5. 批量构建能覆盖全市场。
 6. 下游 `filter` / `alpha/pas` / `position` 能消费 `execution_context_snapshot`。
 
-## 11. 设计文档索引
+## 12. 设计文档索引
 
 | 文档 | 内容 |
 |------|------|
 | `00-malf-charter` | 模块章程（本文） |
-| `01-malf-full-cycle-layering` | 月线 / 周线 / 日线三层分工设计 |
-| `02-malf-monthly-state-8` | 月线八态计算规格 |
+| `01-malf-full-cycle-layering` | 两步分工设计（上下文分类 + 三轴度量） |
+| `02-malf-month-background-2` | 月线牛熊判定规格 |
 | `03-malf-weekly-flow-relation` | 周线顺逆计算规格 |
-| `04-malf-daily-rhythm-new-high-counting` | 日线新价结构计算规格 |
+| `04-malf-day-three-axis` | 生命周期三轴度量定义 |
 | `05-malf-four-context-and-lifecycle-ranking-charter` | 四格上下文与生命周期三轴排位章程 |

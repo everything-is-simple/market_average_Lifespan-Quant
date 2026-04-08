@@ -5,10 +5,12 @@
 本文定义 `system` 模块的编排内核，包括：
 
 1. 三级 Runner 的完整接口与伪代码
-2. run_id 生成规范与 RunMetadata 合同
-3. `_meta_runs` 表 schema
+2. run_id 生成规范与 RunMetadata 目标合同
+3. `_meta_runs` 表目标 schema
 4. 全链路（scan / backtest / closeout）调用序列图
-5. 错误捕获与 error_summary 规范
+5. 错误捕获与 error_summary 目标规范
+
+说明：当前代码中已核实实现的是 `run_daily_signal_scan()` / `SystemRunSummary` / `StockScanTrace`；`RunMetadata`、`_meta_runs`、`backtest / closeout` runner 仍属于设计目标态。
 
 本文不回答：
 - 上线成熟度评估（见 §02 文档）
@@ -71,6 +73,8 @@ def build_run_id(
 ---
 
 ## 4. RunMetadata 合同与 _meta_runs 表
+
+> 以下内容是**目标态设计合同**，当前代码未核实到持久化实现。
 
 ### 4.1 RunMetadata 数据合同
 
@@ -151,21 +155,22 @@ def run_daily_signal_scan(
     workspace: WorkspaceRoots | None = None,
     enabled_patterns: list[str] | None = None,
     top_n: int = 20,
-) -> SystemScanSummary:
+) -> SystemRunSummary:
 ```
 
 ### 5.2 调用序列
 
 ```
 for code in codes:
-    1. 读取日线 OHLCV（market_base.adj_daily_bar）
+    1. 读取 `adj_daily_bar / stock_monthly_adjusted / stock_weekly_adjusted`
     2. build_malf_context_for_stock()          → MalfContext
     3. build_structure_snapshot()              → StructureSnapshot
-    4. check_adverse_conditions()              → AdverseResult
-       ├─ tradeable=False → filtered_out++, continue
-    5. run_all_detectors(patterns=enabled_patterns)  → list[PasTrace]
+    4. check_adverse_conditions()              → AdverseConditionResult
+       ├─ tradeable=False → 记录 StockScanTrace，filtered_out++, continue
+    5. run_all_detectors(patterns=enabled_patterns, struct_snap=...) → list[PasDetectTrace]
     6. 过滤 triggered=True 的 trace → PasSignal
-    7. 追加 signals[]
+    7. 追加 signals[] 与 stock_traces[]
+    8. 捕获异常 → scan_errors[]
 按 strength 降序排列 signals
 ```
 
@@ -173,7 +178,7 @@ for code in codes:
 
 ```python
 @dataclass(frozen=True)
-class SystemScanSummary:
+class SystemRunSummary:
     run_id: str
     signal_date: date
     codes_scanned: int
@@ -181,25 +186,27 @@ class SystemScanSummary:
     signals_found: int
     pattern_counts: dict[str, int]  # pattern → count
     top_signals: list[dict]         # 前 N 个信号的 as_dict()
+    scan_errors: list[dict[str, Any]]
+    stock_traces: list[dict[str, Any]]
 ```
 
 ### 5.4 BPB 禁止实现
 
-```python
-# BPB 在 system 层永久禁止（已正式研究但不进入主线执行）
-FORBIDDEN_PATTERNS = {"BPB"}
+  ```python
+  if enabled_patterns is None:
+      enabled_patterns = [
+          p.value for p, status in PAS_TRIGGER_STATUS.items()
+          if status in (PasTriggerStatus.MAINLINE, PasTriggerStatus.CONDITIONAL)
+      ]
+  ```
 
-if enabled_patterns is None:
-    enabled_patterns = [
-        p.value for p, status in PAS_TRIGGER_STATUS.items()
-        if status in (PasTriggerStatus.MAINLINE, PasTriggerStatus.CONDITIONAL)
-        and p.value not in FORBIDDEN_PATTERNS   # 明确排除 BPB
-    ]
-```
+  说明：当前实现通过 `PAS_TRIGGER_STATUS` 只启用 `MAINLINE / CONDITIONAL` trigger，因此当前 `BPB / CPB` 都不会进入默认主线；若未来状态表口径变化，仍必须维持所有 `REJECTED` trigger 在 system 主线外，其中 `BPB` 继续视为永久禁止。
 
 ---
 
 ## 6. Runner 2：run_backtest_window（待实现）
+
+> 以下内容是**目标态伪代码**，不是当前已实现合同。
 
 ### 6.1 接口
 
@@ -215,7 +222,7 @@ def run_backtest_window(
 ) -> SystemBacktestSummary:
 ```
 
-### 6.2 调用序列（全链路串联）
+### 6.2 调用序列
 
 ```
 run_id = build_run_id("backtest", RunMode.BACKTEST, start=start_date, end=end_date)
@@ -224,23 +231,20 @@ start_run_metadata(conn, ...)        # 写 RUNNING
 Step 1: PAS 信号扫描（批量，覆盖 [start_date, end_date]）
     for signal_date in trade_calendar(start_date, end_date):
         scan_result = run_daily_signal_scan(signal_date, codes, ...)
-        pas_signals.extend(scan_result.signals)
+        # 当前 run_daily_signal_scan() 并不返回 raw PasSignal 列表；
+        # 若未来 backtest runner 需要直接消费批量信号，必须先扩展扫描合同或新增桥接层。
 
 Step 2: position 规划（批量）
     for signal in pas_signals:
         plan = compute_position_plan(signal, market_base_conn)
         exit_plan = build_exit_plan(plan)
-        position_plans.append(plan)
-        exit_plans[plan.code] = exit_plan
+        # ...
 
 Step 3: trade 回测引擎
-    backtest_summary = BacktestEngine(
-        plans=position_plans,
-        exit_plans=exit_plans,
-        market_db=market_base_conn,
-        initial_cash=initial_cash,
-        run_id=run_id,
-    ).run(start=start_date, end=end_date)
+    backtest_summary = BacktestEngine([plan], {plan.code: exit_plan}, ...).run(
+        start=start_date, end=end_date
+    )
+    # ...
 
 Step 4: 生成系统级摘要
     system_summary = SystemBacktestSummary(
@@ -250,7 +254,7 @@ Step 4: 生成系统级摘要
         trade_count=backtest_summary.trade_count,
         net_return_pct=backtest_summary.net_return_pct,
         max_drawdown_pct=backtest_summary.max_drawdown_pct,
-        ...
+        # ...
     )
 
 Step 5: 写 JSON + markdown report
@@ -292,6 +296,8 @@ class SystemBacktestSummary:
 
 ## 7. Runner 3：run_system_closeout（待实现）
 
+> 以下内容是**目标态伪代码**，不是当前已实现合同。
+
 ### 7.1 目的
 
 `closeout` 不是生产运行，而是**主线可重跑验证**：
@@ -320,7 +326,9 @@ Step 1: 单股信号扫描
     → 检查 signals_found > 0（如无信号，记录为 WARNING，不 blocking）
 
 Step 2: position 规划
-    plan = compute_position_plan(scan_result.top_signals[0], ...)
+    # 当前 top_signals 是 dict 摘要，不是 Position/Trade 可直接消费的正式信号合同；
+    # 若未来 closeout 需要直连 position，必须先定义从 summary 到正式 PasSignal 的桥接方式。
+    plan = compute_position_plan(...)
     exit_plan = build_exit_plan(plan)
     → 检查 plan.lot_count >= 1（sanity check）
 
@@ -328,7 +336,7 @@ Step 3: 最小回测（单股 30 日窗口）
     backtest_summary = BacktestEngine([plan], {plan.code: exit_plan}, ...).run(
         start=signal_date, end=signal_date + timedelta(days=30)
     )
-    → 检查 trade_count >= 1
+    # ...
 
 Step 4: 计算 blocking_items
     blocking_items = []
@@ -393,7 +401,7 @@ def _safe_run_step(
 ...
 ```
 
-每个失败步骤一行，多步骤失败则多行拼接，最终写入 `_meta_runs.error_summary`。
+每个失败步骤一行，多步骤失败则多行拼接；当前已实现 runner 至少要能在内存摘要中保留错误轨迹，未来目标态再写入 `_meta_runs.error_summary`。
 
 ### 8.2 禁止行为
 
@@ -476,8 +484,8 @@ run_system_closeout()
 
 ## 10. 禁止操作
 
-1. `system` 层直接查询 DuckDB 业务表做计算（只允许读 `_meta_runs` 表）
-2. 在 BPB 被允许的 `enabled_patterns` 参数下运行任何 runner
+1. `system` 层直接查询 DuckDB 业务表做计算（目标态也只允许读 `_meta_runs` 元数据，不得越权读取业务表做业务计算）
+2. 在 `REJECTED` trigger（当前至少 `BPB / CPB`）被允许的 `enabled_patterns` 参数下运行任何 runner
 3. 在子模块调用失败后继续执行后续步骤（必须 fail-fast 或记录 blocking item）
 4. 生成没有 run_id 的运行记录（每次 runner 必须有 run_id）
-5. `system` 层直接写 `research_lab / market_base`（只写 `trade_runtime._meta_runs` 和 temp/report 文件）
+5. `system` 层直接写 `research_lab / market_base`（目标态也只允许写 `_meta_runs` 与 temp/report 产物）

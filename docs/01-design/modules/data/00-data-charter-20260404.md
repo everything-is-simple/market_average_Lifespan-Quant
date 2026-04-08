@@ -106,19 +106,20 @@ txt 文件格式（TSV，每文件单只股票全历史）：
 | 目录 | 实际路径 | 用途 |
 |---|---|---|
 | repo | `H:\Lifespan-Quant` | 代码、文档、测试、治理 |
-| data | `H:\Lifespan-Quant-data` | 正式五数据库、数据产物 |
-| temp | `H:\Lifespan-Quant-temp` | 临时文件、pytest、中间产物 |
+| data | `H:\Lifespan-Quant-data` | 正式七数据库、数据产物 |
+| temp | `H:\Lifespan-temp` | 临时文件、pytest、中间产物 |
 | report | `H:\Lifespan-Quant-report` | 报表、图表、正式导出 |
 | validated | `H:\Lifespan-Quant-Validated` | 跨版本验证资产快照 |
 
-对应 `paths.py` 常量（待修正）：
+对应 `paths.py` 当前默认常量：
 
 ```python
 _DATA_DIRNAME      = "Lifespan-Quant-data"
-_TEMP_DIRNAME      = "Lifespan-Quant-temp"
+_TEMP_DIRNAME      = "Lifespan-temp"
 _REPORT_DIRNAME    = "Lifespan-Quant-report"
 _VALIDATED_DIRNAME = "Lifespan-Quant-Validated"
 _DEFAULT_TDX_ROOT  = Path(r"H:\new_tdx64")
+_DEFAULT_TDX_OFFLINE_DATA_ROOT = Path(r"H:\tdx_offline_Data")
 ```
 
 ## 6. 模块边界
@@ -153,16 +154,16 @@ txt 文件命名：`{MARKET}#{CODE}.txt`，如 `SH#600000.txt`、`BJ#430047.txt`
 | 文件 | 职责 | 状态 |
 |---|---|---|
 | `src/lq/data/bootstrap.py` | L1/L2 schema 定义 | ✅ 已建 |
-| `src/lq/data/contracts.py` | 数据合同（DataSourceType 等） | ✅ 已建（需追加 TDX_OFFLINE_TXT） |
+| `src/lq/data/contracts.py` | 数据合同（DataSourceType 等） | ✅ 已建（已含 `TDX_OFFLINE_TXT`） |
 | `src/lq/data/providers/tdx_local.py` | .day 二进制解析 | ✅ 已建 |
-| `src/lq/data/providers/tdx_txt_reader.py` | **txt 全量灌入解析器** | ❌ 待建 |
+| `src/lq/data/providers/tdx_txt_reader.py` | **txt 全量灌入解析器** | ✅ 已建 |
 | `src/lq/data/providers/tushare_http.py` | Tushare HTTP 审计客户端 | ✅ 已建 |
 | `src/lq/data/providers/baostock.py` | BaoStock 审计 provider | ✅ 已建 |
 | `src/lq/data/compute/adjust.py` | 后复权因子计算 | ✅ 已建 |
 | `src/lq/data/compute/aggregate.py` | 周/月线聚合 | ✅ 已建 |
 | `src/lq/data/compute/pipeline.py` | L1→L2 构建管道 | ✅ 已建 |
 | `src/lq/data/audit/baostock_probe.py` | BaoStock 差异探针 | ✅ 已建 |
-| `scripts/data/bootstrap_from_txt.py` | **一次性 txt 全量灌入脚本** | ❌ 待建 |
+| `scripts/data/bootstrap_from_txt.py` | **一次性 txt 全量灌入脚本** | ✅ 已建 |
 | `scripts/data/bootstrap_storage.py` | 存储初始化 | ✅ 已建 |
 | `scripts/data/fetch_daily.py` | .day 增量获取 | ✅ 已建 |
 | `scripts/data/ingest_xdxr.py` | gbbq 入库 | ✅ 已建 |

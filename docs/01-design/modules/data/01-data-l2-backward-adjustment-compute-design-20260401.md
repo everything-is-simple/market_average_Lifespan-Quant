@@ -1,13 +1,18 @@
 # data L2 后复权计算管道设计 / 2026-04-01
 
-> 继承父系统 data 模块设计（49/50/51/137 号卡冻结口径），定义本系统 L1→L2 后复权计算的完整边界。
+> 继承父系统 data 模块设计（49/50/51/137 号卡冻结口径），在 `00-data-charter-20260404.md` 的两步走架构下，定义本系统 Step 2（`.day + gbbq` 日增量路径）的 L1→L2 后复权计算边界。
 
 ## 1. 问题陈述
 
-`bootstrap.py` 已建立 `stock_daily_adjusted / stock_weekly_adjusted / stock_monthly_adjusted` 的 schema，
-但目前**没有任何代码从 L1 数据计算 L2 后复权价格**。
+当前 `bootstrap.py` 已建立 `stock_daily_adjusted / stock_weekly_adjusted / stock_monthly_adjusted` 的 schema，
+`compute/adjust.py`、`compute/aggregate.py`、`compute/pipeline.py` 与 `scripts/data/build_l2_adjusted.py` 也已落地。
 
-这是全链路最关键的阻塞点：malf / structure / alpha/pas 全部依赖 L2 数据。
+因此，本文当前不再回答“L2 后复权是否已有实现”，而是冻结 Step 2（日增量）这条正式计算路径的边界、公式与约束，作为 `014 / 015` 的 design 锚点。
+
+两步走架构下：
+
+1. Step 1（`TDX_OFFLINE_DATA_ROOT` txt 全量灌入）由 `02-data-l1-tdx-txt-bulk-import-design-20260404.md` 覆盖
+2. 本文只覆盖 Step 2（`TDX_ROOT` 下 `.day + gbbq`）的 L1→L2 本地计算路径
 
 ## 2. 后复权因子计算口径（冻结）
 
@@ -83,7 +88,7 @@ adj_low(T)   = raw_low(T)   × backward_factor(T)
 
 ## 6. asset_master / block_master（标准化资产主数据）
 
-父系统 data spec §5.1 要求的 L2 标准表，当前 bootstrap 缺失：
+父系统 data spec §5.1 要求的 L2 标准表，当前已补入 `bootstrap.py`：
 
 | 表名 | 来源 | 用途 |
 |---|---|---|
@@ -91,17 +96,17 @@ adj_low(T)   = raw_low(T)   × backward_factor(T)
 | `block_master` | TDX `tdxhy.cfg / tdxzs.cfg` | 行业/板块分类主表 |
 | `block_membership_snapshot` | TDX block 文件 | 股票-板块从属关系快照 |
 
-**当前行动**：补入 bootstrap.py 的 MARKET_BASE_SCHEMA_STATEMENTS。
+**当前状态**：相关 schema 已进入 `bootstrap.py` 的 `MARKET_BASE_SCHEMA_STATEMENTS`。
 
 ## 7. 代码落点
 
 | 文件 | 职责 |
 |---|---|
-| `src/lq/data/bootstrap.py` | L2 schema（已有），补 asset_master 等表 |
-| `src/lq/data/compute/adjust.py` | 后复权因子计算核心逻辑（待建） |
-| `src/lq/data/compute/aggregate.py` | 周线/月线聚合（待建） |
-| `src/lq/data/compute/pipeline.py` | 完整 L1→L2 构建管道入口（待建） |
-| `scripts/data/build_l2_adjusted.py` | 脚本入口（待建） |
+| `src/lq/data/bootstrap.py` | L2 schema（已含 asset_master / block_master / block_membership_snapshot） |
+| `src/lq/data/compute/adjust.py` | 后复权因子计算核心逻辑（已建） |
+| `src/lq/data/compute/aggregate.py` | 周线/月线聚合（已建） |
+| `src/lq/data/compute/pipeline.py` | 完整 L1→L2 构建管道入口（已建） |
+| `scripts/data/build_l2_adjusted.py` | Step 2 构建脚本入口（已建） |
 
 ## 8. 验证标准（对齐父系统 137 号卡）
 

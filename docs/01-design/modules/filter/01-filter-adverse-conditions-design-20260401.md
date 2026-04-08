@@ -196,14 +196,17 @@ if len(triggered_patterns) >= 2:
 ### 7.1 触发条件（OR 关系，任一满足）
 
 ```python
-# 条件1：熊市持续（BEAR_PERSISTING_BLOCK=True 时屏蔽）
+# 正式摘要：长期背景为 BEAR，说明主环境不支持做多
+long_background_2 == "BEAR"
+
+# 兼容细粒度：若处于 BEAR_PERSISTING，则按最危险背景处理
 monthly == "BEAR_PERSISTING"
 
-# 条件2：熊市形成（BEAR_FORMING_BLOCK 开关，默认 False = 屏蔽）
-monthly == "BEAR_FORMING"
+# 兼容细粒度：BEAR_FORMING 是否屏蔽由开关控制
+monthly == "BEAR_FORMING" AND BEAR_FORMING_BLOCK is True
 
-# 条件3：熊市持续 + 逆流（双重熊市信号，屏蔽）
-monthly == "BEAR_PERSISTING" AND weekly_flow == "against_flow"
+# 正式中期角色：熊市持续 + COUNTERTREND（逆势反弹）视为双重不利
+monthly == "BEAR_PERSISTING" AND intermediate_role_2 == "COUNTERTREND"
 ```
 
 ### 7.2 算法实现
@@ -213,14 +216,18 @@ def _check_background_not_supporting(malf_ctx: MalfContext | None) -> bool:
     if malf_ctx is None:
         return False          # 无背景信息，保守不过滤
 
+    long_bg = malf_ctx.long_background_2
+    inter_role = malf_ctx.intermediate_role_2
     monthly = malf_ctx.monthly_state
-    weekly  = malf_ctx.weekly_flow
+
+    if long_bg != "BEAR":
+        return False
 
     if BEAR_PERSISTING_BLOCK and monthly == "BEAR_PERSISTING":
         return True
-    if not BEAR_FORMING_BLOCK and monthly == "BEAR_FORMING":
+    if BEAR_FORMING_BLOCK and monthly == "BEAR_FORMING":
         return True
-    if monthly == "BEAR_PERSISTING" and weekly == "against_flow":
+    if monthly == "BEAR_PERSISTING" and inter_role == "COUNTERTREND":
         return True
     return False
 ```
@@ -231,86 +238,29 @@ def _check_background_not_supporting(malf_ctx: MalfContext | None) -> bool:
 - 熊市持续期间，系统默认屏蔽所有做多信号
 - 理由：主趋势明确向下时，逆势做多的赔率显著偏低
 
-**`BEAR_FORMING_BLOCK = False`**（默认关闭 = 实际屏蔽）：
-- `False` 意味着"不设例外"——熊市形成期也被屏蔽
-- 如果改为 `True`，则熊市形成期允许 BOF 信号（逆势尝试）
-- 当前保守策略：熊市形成期也屏蔽
+**`BEAR_FORMING_BLOCK = False`**（默认关闭 = 默认放行）：
+- `False` 意味着熊市形成期暂不单独屏蔽，由后续 trigger 与其他 adverse 条件继续判断
+- 如果改为 `True`，则熊市形成期也会被 A4-5 直接屏蔽
+- 当前策略是：保留 `BEAR_FORMING` 作为可配置边界，不默认一刀切屏蔽
 
-### 7.4 与 16 格验证框架的关联
+### 7.4 正式主轴说明
 
-A4-5 实际上是"背景格过滤"的简化版：
+- `long_background_2` / `intermediate_role_2` / `malf_context_4` 是 A4-5 的正式背景摘要来源
+- `monthly_state` / `weekly_flow` 仍可读取，但只用于兼容保留的细粒度阶段差异（如 `BEAR_FORMING` 与 `BEAR_PERSISTING`）
+
+### 7.5 与旧 16 格验证框架的历史关联
+
+A4-5 可以与旧验证资料中的“背景格”做历史映射对照，但这种对照只用于追溯理解，不代表当前正式执行主轴回退到旧 `16-cell`：
 
 | 月线状态 | 当前处理 | 16 格对应 |
 |---|---|---|
 | BULL_FORMING / BULL_PERSISTING | 不过滤（最佳背景） | 主流牛市格 |
 | BULL_EXHAUSTING / BULL_REVERSING | 不过滤（谨慎） | 可用，边界格 |
 | BEAR_EXHAUSTING / BEAR_REVERSING | 不过滤（允许逆势反弹） | 反转候选格 |
-| BEAR_FORMING | 屏蔽（当前策略） | 危险格 |
+| BEAR_FORMING | 默认不屏蔽，可配置屏蔽 | 危险格 |
 | BEAR_PERSISTING | 屏蔽（当前策略） | 最危险格 |
 
-未来升级方向：将 A4-5 扩展为完整的 16 格准入矩阵（每个格对应不同的触发器准入规则），而不是简单的"熊市屏蔽"。
-
----
-
-## 8. 主函数：check_adverse_conditions()
-
-### 8.1 执行序列
-
-```python
-def check_adverse_conditions(...) -> AdverseConditionResult:
-    active = []
-
-    # A4-1: 压缩且无方向（需要 daily_bars）
-    if not daily_bars.empty and _check_compression_no_direction(daily_bars):
-        active.append("COMPRESSION_NO_DIRECTION")
-
-    # A4-2: 结构混乱（需要 daily_bars）
-    if not daily_bars.empty and _check_structural_chaos(daily_bars):
-        active.append("STRUCTURAL_CHAOS")
-
-    # A4-3: 空间不足（需要 structure 输出的价格 + current_price）
-    current_price = daily_bars.tail(1)["adj_close"].iloc[0]
-    if _check_insufficient_space(nearest_support_price, nearest_resistance_price, current_price):
-        active.append("INSUFFICIENT_SPACE")
-
-    # A4-4: 暂缺（预留位置）
-
-    # A4-5: 背景不支持（需要 MalfContext）
-    if _check_background_not_supporting(malf_ctx):
-        active.append("BACKGROUND_NOT_SUPPORTING")
-
-    tradeable = len(active) == 0
-    return AdverseConditionResult(
-        code=code,
-        signal_date=signal_date,
-        active_conditions=tuple(active),
-        tradeable=tradeable,
-        notes="；".join(note_parts) if note_parts else "无不利条件",
-    )
-```
-
-### 8.2 各参数为 None 时的行为
-
-| 参数 | 为 None 时 | 受影响的条件 |
-|---|---|---|
-| `daily_bars` 为空 | A4-1/A4-2/A4-3 均跳过 | 保守：不过滤 |
-| `malf_ctx=None` | A4-5 跳过 | 保守：不过滤 |
-| `nearest_support_price=None` | A4-3 跳过 | 保守：不过滤 |
-| `nearest_resistance_price=None` | A4-3 跳过 | 保守：不过滤 |
-
-**保守原则**：当信息不足时，不过滤（宁可放行让 trigger 去判断，而不是因为信息缺失误杀信号）。
-
----
-
-## 9. 快捷接口：is_tradeable()
-
-```python
-def is_tradeable(...) -> bool:
-    """布尔快捷接口，内部调用 check_adverse_conditions()。"""
-    return check_adverse_conditions(...).tradeable
-```
-
-适用于只需要布尔结论、不需要 `active_conditions` 详情的场景（如批量预筛选）。
+正式口径保持为：A4-5 的背景合同收敛到 `long_background_2 / intermediate_role_2 / malf_context_4` 这一组 MALF 正式摘要；`monthly_state / weekly_flow` 仅保留兼容细粒度差异，不再把旧 `16-cell` 写成 filter 的未来正式目标态。
 
 ---
 
@@ -320,6 +270,6 @@ def is_tradeable(...) -> bool:
 |---|---|---|---|
 | F1 | A4-4 信号冲突未实现 | 需要 alpha 模块反向接口 | 等待依赖矩阵设计后引入 |
 | F2 | A4-2 基于收盘价计数 | 可能把正常回调计为混乱 | 未来改用 swing 序列方向分析 |
-| F3 | A4-5 是简化版 16 格 | 只做熊市屏蔽，非完整背景格矩阵 | L2 上线时扩展为完整矩阵 |
+| F3 | A4-5 当前只做保守背景屏蔽 | 目前尚未引入按 trigger 分层的更细背景准入，但这不意味着回到旧 `16-cell` 主轴 | 如需增强，只能基于当前正式背景摘要另开卡扩展 |
 | F4 | 参数未经回测优化 | 当前参数为经验值 | R3 研究储备：参数回测调优 |
 | F5 | 无按触发器区分的过滤规则 | 所有触发器用同一套过滤 | 未来允许 BOF 在熊市形成期通过（单独配置） |

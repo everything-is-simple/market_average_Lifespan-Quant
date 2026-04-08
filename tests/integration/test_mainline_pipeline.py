@@ -336,7 +336,27 @@ def _build_pas_signal(trace: PasDetectTrace, malf_ctx: MalfContext) -> PasSignal
         code=CODE,
         signal_date=SIGNAL_DATE,
         pattern=trace.pattern,
+        long_background_2=malf_ctx.long_background_2,
+        intermediate_role_2=malf_ctx.intermediate_role_2,
         malf_context_4=malf_ctx.malf_context_4,
+        amplitude_rank_low=malf_ctx.amplitude_rank_low,
+        amplitude_rank_high=malf_ctx.amplitude_rank_high,
+        amplitude_rank_total=malf_ctx.amplitude_rank_total,
+        duration_rank_low=malf_ctx.duration_rank_low,
+        duration_rank_high=malf_ctx.duration_rank_high,
+        duration_rank_total=malf_ctx.duration_rank_total,
+        new_price_rank_low=malf_ctx.new_price_rank_low,
+        new_price_rank_high=malf_ctx.new_price_rank_high,
+        new_price_rank_total=malf_ctx.new_price_rank_total,
+        lifecycle_rank_low=malf_ctx.lifecycle_rank_low,
+        lifecycle_rank_high=malf_ctx.lifecycle_rank_high,
+        lifecycle_rank_total=malf_ctx.lifecycle_rank_total,
+        amplitude_quartile=malf_ctx.amplitude_quartile,
+        duration_quartile=malf_ctx.duration_quartile,
+        new_price_quartile=malf_ctx.new_price_quartile,
+        lifecycle_quartile=malf_ctx.lifecycle_quartile,
+        monthly_state=malf_ctx.monthly_state,
+        weekly_flow=malf_ctx.weekly_flow,
         strength=trace.strength,
         signal_low=float(_DAILY["adj_low"].iloc[-1]),          # 信号日最低价
         entry_ref_price=float(_DAILY["adj_close"].iloc[-1]),   # 信号日收盘价
@@ -414,6 +434,8 @@ class TestExplainChainAssembly:
             run_id=run_id,
             code=CODE,
             signal_date=SIGNAL_DATE,
+            long_background_2=self.ctx.long_background_2,
+            intermediate_role_2=self.ctx.intermediate_role_2,
             monthly_state=self.ctx.monthly_state,
             malf_context_4=self.ctx.malf_context_4,
             tradeable=adverse.tradeable,
@@ -434,7 +456,9 @@ class TestExplainChainAssembly:
         assert self.trace_dict["signal_date"] == SIGNAL_DATE.isoformat()
 
     def test_malf_state_in_explain_chain(self):
-        """解释链应携带 monthly_state 和 malf_context_4（MALF 摘要）。"""
+        """解释链应携带正式 MALF 摘要 + monthly_state 兼容字段。"""
+        assert self.trace_dict["long_background_2"] == "BULL"
+        assert self.trace_dict["intermediate_role_2"] == "MAINSTREAM"
         assert self.trace_dict["monthly_state"].startswith("BULL")
         assert self.trace_dict["malf_context_4"] == "BULL_MAINSTREAM"
 
@@ -470,6 +494,8 @@ class TestExplainChainAssembly:
             run_id="run-bear",
             code=CODE,
             signal_date=SIGNAL_DATE,
+            long_background_2=bear_ctx.long_background_2,
+            intermediate_role_2=bear_ctx.intermediate_role_2,
             monthly_state=bear_ctx.monthly_state,
             malf_context_4=bear_ctx.malf_context_4,
             tradeable=adverse.tradeable,
@@ -504,6 +530,8 @@ class TestExplainChainStructureSummary:
             run_id="integ-p104",
             code=CODE,
             signal_date=SIGNAL_DATE,
+            long_background_2=ctx.long_background_2,
+            intermediate_role_2=ctx.intermediate_role_2,
             monthly_state=ctx.monthly_state,
             malf_context_4=ctx.malf_context_4,
             tradeable=adverse.tradeable,
@@ -560,6 +588,8 @@ class TestExplainChainStructureSummary:
             run_id="run-bear-p104",
             code=CODE,
             signal_date=SIGNAL_DATE,
+            long_background_2=bear_ctx.long_background_2,
+            intermediate_role_2=bear_ctx.intermediate_role_2,
             monthly_state=bear_ctx.monthly_state,
             malf_context_4=bear_ctx.malf_context_4,
             tradeable=adverse.tradeable,

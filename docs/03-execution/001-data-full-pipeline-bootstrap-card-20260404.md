@@ -1,5 +1,7 @@
 # CARD-001 data 全链路 bootstrap（txt 全量灌入 + 路径修正）/ 2026-04-04
 
+**状态**: `historical`
+
 ## 目标
 
 完成 data 模块从零到可用的全链路初始化：

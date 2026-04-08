@@ -79,6 +79,8 @@ class StockScanTrace:
     code: str
     signal_date: date
     # MALF 摘要
+    long_background_2: str
+    intermediate_role_2: str
     monthly_state: str
     malf_context_4: str
     # 不利条件过滤结果
@@ -95,6 +97,8 @@ class StockScanTrace:
             "run_id": self.run_id,
             "code": self.code,
             "signal_date": self.signal_date.isoformat(),
+            "long_background_2": self.long_background_2,
+            "intermediate_role_2": self.intermediate_role_2,
             "monthly_state": self.monthly_state,
             "malf_context_4": self.malf_context_4,
             "tradeable": self.tradeable,
@@ -234,6 +238,8 @@ def run_daily_signal_scan(
                     run_id=run_id,
                     code=code,
                     signal_date=signal_date,
+                    long_background_2=malf_ctx.long_background_2,
+                    intermediate_role_2=malf_ctx.intermediate_role_2,
                     monthly_state=malf_ctx.monthly_state,
                     malf_context_4=malf_ctx.malf_context_4,
                     tradeable=False,
@@ -255,6 +261,8 @@ def run_daily_signal_scan(
                 run_id=run_id,
                 code=code,
                 signal_date=signal_date,
+                long_background_2=malf_ctx.long_background_2,
+                intermediate_role_2=malf_ctx.intermediate_role_2,
                 monthly_state=malf_ctx.monthly_state,
                 malf_context_4=malf_ctx.malf_context_4,
                 tradeable=True,
@@ -275,7 +283,27 @@ def run_daily_signal_scan(
                     code=code,
                     signal_date=signal_date,
                     pattern=trace.pattern,
+                    long_background_2=malf_ctx.long_background_2,
+                    intermediate_role_2=malf_ctx.intermediate_role_2,
                     malf_context_4=malf_ctx.malf_context_4,
+                    amplitude_rank_low=malf_ctx.amplitude_rank_low,
+                    amplitude_rank_high=malf_ctx.amplitude_rank_high,
+                    amplitude_rank_total=malf_ctx.amplitude_rank_total,
+                    duration_rank_low=malf_ctx.duration_rank_low,
+                    duration_rank_high=malf_ctx.duration_rank_high,
+                    duration_rank_total=malf_ctx.duration_rank_total,
+                    new_price_rank_low=malf_ctx.new_price_rank_low,
+                    new_price_rank_high=malf_ctx.new_price_rank_high,
+                    new_price_rank_total=malf_ctx.new_price_rank_total,
+                    lifecycle_rank_low=malf_ctx.lifecycle_rank_low,
+                    lifecycle_rank_high=malf_ctx.lifecycle_rank_high,
+                    lifecycle_rank_total=malf_ctx.lifecycle_rank_total,
+                    amplitude_quartile=malf_ctx.amplitude_quartile,
+                    duration_quartile=malf_ctx.duration_quartile,
+                    new_price_quartile=malf_ctx.new_price_quartile,
+                    lifecycle_quartile=malf_ctx.lifecycle_quartile,
+                    monthly_state=malf_ctx.monthly_state,
+                    weekly_flow=malf_ctx.weekly_flow,
                     strength=trace.strength,
                     signal_low=float(daily_df["adj_low"].iloc[-1]),
                     entry_ref_price=current_close,

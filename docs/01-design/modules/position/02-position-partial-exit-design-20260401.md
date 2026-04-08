@@ -175,10 +175,15 @@ if half_shares < lot_size:
 ```
 结构：两腿
 腿1 (first_target): entry_price + 1R 触发，卖出 half_lot（50% A股整手约束）
-腿2 (runner):       剩余仓位跟踪止损，从持仓最高点回撤 trailing_pct 触发
+腿2 (runner):       `position` 当前只生成 runner 腿合同与初始 `trailing_stop_trigger` 占位值
 ```
 
-参数：`trailing_pct = 0.08`（8% 回撤触发）
+参数：`trailing_pct = 0.08`（当前仅用于 `build_exit_plan()` 生成基于 `entry_price` 的初始 trigger 占位值）
+
+当前边界：
+- `build_exit_plan()` 里的 `trailing_stop_trigger = entry_price * (1 - trailing_pct)`，它不是最终运行期的动态最高价跟踪止损
+- 真正基于 `highest_price_seen` 的 runner 跟踪止损由 `trade.management` 在持仓期间动态维护
+- 当前 `trade.management` 使用的是 `TRAILING_ACTIVATION_R = 1.0` 与 `TRAILING_STEP_PCT = 0.06`，尚未与 `position` 的占位 trigger 收敛成同一正式合同
 
 **与 50/50 的区别**：
 - 第一腿触发条件是价格绝对目标（1R），不是跟踪止损百分比

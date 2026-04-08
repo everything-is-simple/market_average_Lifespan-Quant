@@ -18,18 +18,19 @@
 
 **父系统（MarketLifespan）：**
 1. `system` 只做编排、调用子模块 runner、汇总摘要、生成报告，**不拥有自己的正式数据库**
-2. 三级 runner 模式：
-   - `run_system_mainline_closeout` — 主线 smoke 验证
+2. 父系统 `mlq.system` 的正式 runner 设计：
+   - `run_system_daily_scan` — 单日扫描
+   - `run_system_closeout` — 单股主线闭环验证
    - `run_system_{pattern}_16cell_backtest` — 单触发器分格回测
    - `run_system_windowed_pas_backtest` — 时间窗多触发器回测
 3. runner 内部串联模式：`PAS build → position bootstrap → sizing migration → partial exit migration → trade bridge → matrix readout`
-4. 每个 runner 产出 JSON summary + markdown report 落入 `temp/` 或 `report/` 目录
+4. 父系统 runner 普遍产出 JSON summary + markdown report 落入 `temp/` 或 `report/` 目录；本系统当前只把该产物形态冻结为目标态，不冒充已实现
 5. 三层上线成熟度（见 §9）、四档信任分级（见 §9），来自 `15-system-launch-readiness-matrix-charter`
 6. 关键概念原则：书本来源 ≠ 系统实现，必须按三档（已实现/部分实现/未实现）严格区分
 
 **本系统（Lifespan-Quant）当前实现：**
 1. `run_daily_signal_scan()` — 每日全市场信号扫描，已实现
-2. 主链路：data → malf_context → structure_snapshot → adverse_conditions → PAS detectors → PasSignal
+2. 主链路：data → MALF 摘要/兼容背景 → structure_snapshot → adverse_conditions → PAS detectors → PasSignal
 3. **待补**：`run_backtest_window`（时间窗回测）、`run_system_closeout`（主线验证）、run metadata 落库
 
 ### 1.2 与父系统的主要差异
@@ -40,7 +41,7 @@
 | Runner 数量 | 4 个 | 3 个（scan / backtest / closeout） |
 | BPB 状态 | 已正式验证但非主线 | **永久禁止于 system 层** |
 | 治理脚本 | 13 个 | 精简为 4 个核心脚本 |
-| Run 元数据 | 写入 research_lab | 写入 `trade_runtime.duckdb` + JSON 文件 |
+| Run 元数据 | 写入 research_lab | 目标态为 `_meta_runs` + JSON 文件；当前代码尚未核实持久化写入 |
 
 ---
 
@@ -48,7 +49,7 @@
 
 `system` 是**唯一的主线编排层**，是系统价值的最终交付入口。
 
-**核心职责**：按序调用各业务模块的公开接口，驱动完整的信号扫描流程和批量回测，输出可审计、可追溯的运行摘要。
+**核心职责**：按序调用各业务模块的公开接口。当前已核实到的是“单日扫描编排 + 解释链汇总”；批量回测、closeout、run metadata 落库仍属于目标态 runner。
 
 **`system` 只做编排，不做计算。** 所有业务逻辑必须在对应模块中实现。
 
@@ -63,10 +64,10 @@ data → malf → structure(filter) → alpha/pas → position → trade → sys
 | 环节 | 对应模块 | 职责 |
 |---|---|---|
 | data | `lq.data` | 拉取、清洗、复权价构建 |
-| malf | `lq.malf` | 月线状态/周线流向/日线现象三层背景 |
+| malf | `lq.malf` | 正式 MALF 摘要 + 兼容背景字段生成 |
 | structure | `lq.structure` | 结构位语言识别 |
 | filter | `lq.filter` | 不利条件过滤（adverse conditions） |
-| alpha/pas | `lq.alpha.pas` | PAS 触发器检测（BOF/PB/TST/CPB；BPB 禁止） |
+| alpha/pas | `lq.alpha.pas` | PAS 触发器检测（默认主线仅启用 `MAINLINE / CONDITIONAL`；`BPB / CPB` 不进入默认主线） |
 | position | `lq.position` | 仓位规划（1R sizing + 退出合同） |
 | trade | `lq.trade` | 交易执行 + 回测引擎 |
 | system | `lq.system` | 编排总控 |
@@ -77,7 +78,7 @@ data → malf → structure(filter) → alpha/pas → position → trade → sys
 
 | Runner | 模式 | 职责 | 状态 |
 |---|---|---|---|
-| `run_daily_signal_scan` | SCAN | 单日全市场信号扫描，输出 `SystemScanSummary` | 已实现 |
+| `run_daily_signal_scan` | SCAN | 单日全市场信号扫描，输出 `SystemRunSummary` | 已实现 |
 | `run_backtest_window` | BACKTEST | 时间窗全链路回测（PAS→position→trade）| 待实现 |
 | `run_system_closeout` | CLOSEOUT | 主线 smoke 验证，确认主线可重跑 | 待实现 |
 
@@ -87,7 +88,7 @@ data → malf → structure(filter) → alpha/pas → position → trade → sys
 
 1. `run_date`（扫描日）或 `[start_date, end_date]`（回测窗口）
 2. `codes: list[str]`（待扫描股票池）
-3. `enabled_patterns: list[str]`（允许的 PAS 触发器，默认排除 BPB）
+3. `enabled_patterns: list[str]`（允许的 PAS 触发器；默认仅启用 `MAINLINE / CONDITIONAL`，因此 `BPB / CPB` 不进入默认主线）
 4. `workspace: WorkspaceRoots`（数据库路径集合，来自环境变量）
 5. `RunMode`（SCAN / BACKTEST / CLOSEOUT）
 
@@ -95,14 +96,14 @@ data → malf → structure(filter) → alpha/pas → position → trade → sys
 
 ## 6. 正式输出
 
+**system 不拥有自己的正式数据库**。目标态只向已有数据库写运行元数据；当前最小实现未核实任何持久化写入。
+
 | 输出对象 | 类型 | 去向 |
 |---|---|---|
-| `SystemScanSummary` | `dataclass` | JSON 文件（temp 目录）|
-| `SystemBacktestSummary` | `dataclass` | JSON + markdown（report 目录） |
-| `SystemCloseoutSummary` | `dataclass` | JSON + markdown（report 目录） |
-| run_id 流水 | 行记录 | `trade_runtime.duckdb` 的 `_meta_runs` 表 |
-
-**system 不拥有自己的正式数据库**，只向已有数据库写运行元数据。
+| `SystemRunSummary` | `dataclass` | 当前返回内存对象；未核实 JSON 落盘 |
+| `SystemBacktestSummary` | `dataclass` | 目标态输出（report 目录），当前未实现 |
+| `SystemCloseoutSummary` | `dataclass` | 目标态输出（report 目录），当前未实现 |
+| run_id 流水 | 行记录 | 目标态写入 `_meta_runs`；当前未核实 |
 
 ---
 
@@ -132,11 +133,10 @@ closeout_closeout_d20240401_t120000_c9d0e1f2
 ### 8.1 负责
 
 1. 主线链路编排（按序调用各模块公开接口）
-2. 三级 runner 实现（scan / backtest / closeout）
-3. run_id 生成与 `_meta_runs` 写入
-4. 系统级 summary JSON + markdown report 生成
-5. 运行日志与错误捕获（失败必须有可读 error_summary，不允许静默失败）
-6. 治理脚本入口（scripts/system/）
+2. 当前已实现 `run_daily_signal_scan`；冻结 `run_backtest_window / run_system_closeout` 的目标态边界，但不把它们冒充为完成事实
+3. 运行日志与错误捕获（当前至少以 `scan_errors` 形式返回，不允许静默失败）
+4. 冻结 run_id / `_meta_runs` / summary 文件输出的目标态合同
+5. 治理脚本入口（`scripts/system/`）作为目标态预留，当前未核实完整实现
 
 ### 8.2 不负责
 
@@ -144,7 +144,7 @@ closeout_closeout_d20240401_t120000_c9d0e1f2
 2. 数据库 schema 创建（属于各模块 bootstrap）
 3. 报告可视化（属于 report 脚本）
 4. MSS/IRS 计算（不在 Lifespan-Quant 主线）
-5. 自有正式数据库（system 无状态库，只写 _meta_runs）
+5. 自有正式数据库（system 无状态库；目标态也只允许写 `_meta_runs`，不拥有独立业务库）
 
 ---
 
@@ -177,10 +177,10 @@ closeout_closeout_d20240401_t120000_c9d0e1f2
 
 1. **system 是唯一可依赖全部模块的模块**，其他模块禁止互相横向依赖
 2. **主线链路顺序冻结**：filter 必须在 alpha/pas 之前，不允许跳过
-3. **BPB 永久禁止**：`system` 层任何调用路径不得出现 BPB；代码注释必须标明原因
-4. **system 无自有数据库**：只写各模块已有数据库的 `_meta_runs` 表和 JSON 文件
-5. **run_id 必须存在**：每次 runner 运行必须生成 run_id，失败必须有 error_summary
-6. **禁止静默失败**：任何业务模块调用异常必须被捕获并写入 error_summary
+3. **REJECTED trigger 不得进入主线**：当前至少 `BPB / CPB` 不得进入 `system` 默认调用路径；其中 BPB 仍需显式视为永久禁止
+4. **system 无自有数据库**：目标态只允许写已有数据库中的 `_meta_runs` 与 temp/report 产物；在当前未实现持久化前，不得把这条写权表述成既成事实
+5. **run_id 必须存在**：当前已实现 runner `run_daily_signal_scan()` 必须生成 run_id；未来其他 runner 也必须遵守
+6. **禁止静默失败**：任何业务模块调用异常必须被捕获；当前最小实现至少要进入 `scan_errors`
 7. **来源 ≠ 实现**：书本概念不自动等于系统已实现能力，三档严格区分
 8. **上线层级显式声明**：提到"系统上线"必须同时标明 L1/L2/L3 中的哪一层
 
@@ -189,11 +189,10 @@ closeout_closeout_d20240401_t120000_c9d0e1f2
 ## 11. 成功标准
 
 1. `run_daily_signal_scan` 端到端运行，覆盖主线全链路（已完成）
-2. `run_backtest_window` 在三年历史窗口正确推进，产出 `SystemBacktestSummary`
-3. `run_system_closeout` 验证主线可重跑，产出 `SystemCloseoutSummary`
-4. BPB 在任何 system 调用路径中均不出现
-5. `_meta_runs` 表有每次 runner 运行的完整记录
-6. 运行失败时 error_summary 有可读内容，不会静默失败
+2. 当前 `SystemRunSummary` 能返回 `pattern_counts / top_signals / scan_errors / stock_traces`
+3. `BPB / CPB` 在任何 system 默认调用路径中均不出现
+4. `run_backtest_window / run_system_closeout / _meta_runs` 若后续补齐，必须另开卡并同步升级本文档
+5. 运行失败时必须有可读错误轨迹；当前最小实现不能静默吞掉 scan 级异常
 
 ---
 

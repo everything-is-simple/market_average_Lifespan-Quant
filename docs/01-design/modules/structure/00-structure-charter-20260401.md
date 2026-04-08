@@ -134,18 +134,18 @@ from lq.core.contracts import StructureLevelType, BreakoutType  # 只依赖 core
 ## 7. 铁律
 
 1. **structure 拥有 `structure.duckdb`**：结构位快照按日按股增量追加，历史一旦计算绝不重算
-2. **增量更新**：只处理新日期，每行带 `config_hash`，参数冻结则跳过已有数据
+2. **增量更新**：当前 pipeline 只处理新日期，并以 `(code, signal_date)` 主键 + 先删后插保证同日同股幂等；`config_hash` 仍是全局治理方向，不得在本模块文档中假定已完整落地
 3. **无 MALF 依赖**：结构位识别只看价格行为，不依赖月线/周线背景（背景判断属于 filter）
-3. **结构位合同格式冻结**：`StructureSnapshot` 的字段结构一旦发布不允许缩减（只允许向后兼容添加）
-4. **强度公式固定**：`strength = 0.5 * age_decay + touch_bonus`，不允许在不同调用路径中使用不同公式
-5. **禁止入场判断**：`structure` 模块禁止返回任何"可以入场"或"不可以入场"的结论，只描述结构事实
+4. **结构位合同格式冻结**：`StructureSnapshot` 的字段结构一旦发布不允许缩减（只允许向后兼容添加）
+5. **强度公式固定**：`strength = 0.5 * age_decay + touch_bonus`，不允许在不同调用路径中使用不同公式
+6. **禁止入场判断**：`structure` 模块禁止返回任何"可以入场"或"不可以入场"的结论，只描述结构事实
 
 ---
 
 ## 7. 成功标准
 
 1. `build_structure_snapshot()` 对任意股票日线数据（≥11 根）不报错，返回有效 `StructureSnapshot`
-2. 在 BULL_FORMING 背景下的主力股，能正确识别至少 1 个支撑位和 1 个阻力位
+2. 在存在清晰箱体或近期波段高低点的代表性股票样本上，能正确识别至少 1 个支撑位和 1 个阻力位
 3. 假突破（BOF）场景：穿越结构位但收回时，`recent_breakout.breakout_type == "FALSE_BREAKOUT"`
 4. 有效突破场景：收盘超越结构位 1% 以上时，`breakout_type == "VALID_BREAKOUT"`
 5. 数据不足（< 11 根）时，`StructureSnapshot` 中 `support_levels` 和 `resistance_levels` 均为空元组，不报错

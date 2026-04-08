@@ -16,14 +16,14 @@
 
 `contracts.py` 按主线链路的层次组织，共四组枚举：
 
-```
-第一组：背景层枚举（MALF）
-    MonthlyState8      — 月线八态（MALF 计算层诊断状态，执行层收敛为 BULL/BEAR）
-    WeeklyFlowRelation — 周线顺衰关系（MALF 计算层，执行层映射为 MAINSTREAM/COUNTERTREND）
-    MalfContext4       — 四格上下文（MALF 执行层主轴）
+ ```
+ 第一组：背景层枚举（MALF）
+     MonthlyState8      — 月线八态（MALF 计算层诊断状态，执行层兼容桥接输入）
+     WeeklyFlowRelation — 周线顺衰关系（MALF 计算层辅助状态，执行层兼容桥接输入）
+     MalfContext4       — 四格上下文（MALF 执行层主轴）
 
 第二组：触发层枚举（PAS）
-    PasTriggerPattern  — 五触发模式
+     PasTriggerPattern  — 五触发模式
     PasTriggerStatus   — 触发器治理状态
     PAS_TRIGGER_STATUS — 当前治理状态字典（冻结）
 
@@ -46,9 +46,23 @@
 
 ## 3. 第一组：背景层枚举（MALF）
 
+`MonthlyState8 / WeeklyFlowRelation / MalfContext4` 三者仍共同存在于 `core.contracts`。
+但按 `016` 执行结论，当前正式口径已经重定向为：
+
+1. `MonthlyState8`：MALF 计算层诊断状态
+2. `WeeklyFlowRelation`：MALF 计算层顺逆辅助状态
+3. `MalfContext4`：MALF 执行层正式主轴
+4. 新设计不得再把 `monthly_state_8 × weekly_flow_relation` 当成执行主读数；生命周期主读数已转到四格上下文下的三轴原始排位与四分位辅助表达
+
 ### 3.1 MonthlyState8 — 月线八态
 
 来源：EQ-gamma `MonthlyState8` + MarketLifespan `monthly_state_8` → 本系统提升到 `core` 层。
+
+当前角色：
+
+1. 作为 `MALF` 计算层的诊断状态保留
+2. 作为旧 run / 旧文档 / 兼容桥接的追溯字段保留
+3. 不再单独承担 `MALF` 执行层主读数职责
 
 | 状态值 | 含义 | 背景特征 |
 |---|---|---|
@@ -68,6 +82,12 @@
 
 ### 3.2 WeeklyFlowRelation — 周线顺衰关系
 
+当前角色：
+
+1. 作为 `MALF` 计算层的顺逆辅助状态保留
+2. 与 `MonthlyState8` 一起，为四格上下文提供兼容推导入口
+3. 不再单独承担执行层主分类职责
+
 | 值 | 含义 |
 |---|---|
 | `with_flow` | 周线与月线同向（顺势） |
@@ -77,7 +97,9 @@
 
 ### 3.3 MalfContext4 — 四格上下文
 
-由 `long_background_2`（BULL/BEAR）+ `intermediate_role_2`（MAINSTREAM/COUNTERTREND）组合生成，是 MALF 执行层的主分类维度。
+按 `016` 当前执行结论，四格上下文是 `MALF` 执行层的正式主轴。
+
+它由 `long_background_2`（BULL/BEAR）+ `intermediate_role_2`（MAINSTREAM/COUNTERTREND）组合生成；为兼容旧入口，代码仍保留 `from_monthly_weekly()`，允许从 `MonthlyState8 + WeeklyFlowRelation` 自动推导四格。
 
 | 值 | long_background_2 | intermediate_role_2 |
 |---|---|---|
@@ -87,6 +109,15 @@
 | BEAR_COUNTERTREND | BEAR | COUNTERTREND |
 
 **`from_monthly_weekly()` 方法**（已实现）：根据月线状态和周线顺衰自动推导四格上下文。
+
+| 月线大类 | 周线关系 | 推导结果 |
+|---|---|---|
+| `MonthlyState8.is_bull = True` | `with_flow` | `BULL_MAINSTREAM` |
+| `MonthlyState8.is_bull = True` | `against_flow` | `BULL_COUNTERTREND` |
+| `MonthlyState8.is_bear = True` | `with_flow` | `BEAR_MAINSTREAM` |
+| `MonthlyState8.is_bear = True` | `against_flow` | `BEAR_COUNTERTREND` |
+
+四格只负责执行层分类；生命周期主读数并不编码在 `core.contracts` 中，而是由 `MALF` 输出的三轴原始排位与四分位辅助表达承担。
 
 ---
 

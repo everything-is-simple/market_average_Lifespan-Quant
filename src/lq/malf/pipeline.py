@@ -27,6 +27,7 @@ from lq.core.resumable import prepare_resumable_checkpoint, save_resumable_check
 from lq.malf.contracts import (
     MalfContext,
     MALFBuildManifest,
+    EXECUTION_CONTEXT_CONTRACT_VERSION,
     build_malf_context_4,
     derive_long_background_2,
     derive_intermediate_role_2,
@@ -95,6 +96,38 @@ CREATE TABLE IF NOT EXISTS malf_build_manifest (
     stock_count    INTEGER DEFAULT 0,
     created_at     TIMESTAMP DEFAULT current_timestamp
 );
+
+CREATE TABLE IF NOT EXISTS execution_context_snapshot (
+    entity_scope            VARCHAR NOT NULL,
+    entity_code             VARCHAR NOT NULL,
+    calc_date               DATE    NOT NULL,
+    run_id                  VARCHAR,
+    long_background_2       VARCHAR NOT NULL,
+    intermediate_role_2     VARCHAR NOT NULL,
+    malf_context_4          VARCHAR NOT NULL,
+    active_wave_id          VARCHAR,
+    historical_sample_count INTEGER,
+    amplitude_rank_low      INTEGER,
+    amplitude_rank_high     INTEGER,
+    amplitude_rank_total    INTEGER,
+    duration_rank_low       INTEGER,
+    duration_rank_high      INTEGER,
+    duration_rank_total     INTEGER,
+    new_price_rank_low      INTEGER,
+    new_price_rank_high      INTEGER,
+    new_price_rank_total    INTEGER,
+    lifecycle_rank_low      INTEGER,
+    lifecycle_rank_high      INTEGER,
+    lifecycle_rank_total    INTEGER,
+    amplitude_quartile      VARCHAR,
+    duration_quartile       VARCHAR,
+    new_price_quartile      VARCHAR,
+    lifecycle_quartile      VARCHAR,
+    ranking_asof_date       DATE,
+    contract_version        VARCHAR NOT NULL,
+    created_at              TIMESTAMP DEFAULT current_timestamp,
+    PRIMARY KEY (entity_scope, entity_code, calc_date)
+);
 """
 
 # 已有数据库的 migration（补齐新字段）
@@ -142,6 +175,18 @@ _SNAPSHOT_COLS = (
     "lifecycle_rank_low", "lifecycle_rank_high", "lifecycle_rank_total",
     "amplitude_quartile", "duration_quartile", "new_price_quartile", "lifecycle_quartile",
     "run_id", "created_at",
+)
+
+_EXECUTION_CONTEXT_COLS = (
+    "entity_scope", "entity_code", "calc_date", "run_id",
+    "long_background_2", "intermediate_role_2", "malf_context_4",
+    "active_wave_id", "historical_sample_count",
+    "amplitude_rank_low", "amplitude_rank_high", "amplitude_rank_total",
+    "duration_rank_low", "duration_rank_high", "duration_rank_total",
+    "new_price_rank_low", "new_price_rank_high", "new_price_rank_total",
+    "lifecycle_rank_low", "lifecycle_rank_high", "lifecycle_rank_total",
+    "amplitude_quartile", "duration_quartile", "new_price_quartile", "lifecycle_quartile",
+    "ranking_asof_date", "contract_version", "created_at",
 )
 
 
@@ -505,16 +550,52 @@ def _context_to_row(ctx: MalfContext) -> dict[str, Any]:
     }
 
 
+def _build_execution_context_df(batch_df: pd.DataFrame) -> pd.DataFrame:
+    exec_df = pd.DataFrame({
+        "entity_scope": "stock",
+        "entity_code": batch_df["code"],
+        "calc_date": batch_df["signal_date"],
+        "run_id": batch_df["run_id"],
+        "long_background_2": batch_df["long_background_2"],
+        "intermediate_role_2": batch_df["intermediate_role_2"],
+        "malf_context_4": batch_df["malf_context_4"],
+        "active_wave_id": None,
+        "historical_sample_count": None,
+        "amplitude_rank_low": batch_df["amplitude_rank_low"],
+        "amplitude_rank_high": batch_df["amplitude_rank_high"],
+        "amplitude_rank_total": batch_df["amplitude_rank_total"],
+        "duration_rank_low": batch_df["duration_rank_low"],
+        "duration_rank_high": batch_df["duration_rank_high"],
+        "duration_rank_total": batch_df["duration_rank_total"],
+        "new_price_rank_low": batch_df["new_price_rank_low"],
+        "new_price_rank_high": batch_df["new_price_rank_high"],
+        "new_price_rank_total": batch_df["new_price_rank_total"],
+        "lifecycle_rank_low": batch_df["lifecycle_rank_low"],
+        "lifecycle_rank_high": batch_df["lifecycle_rank_high"],
+        "lifecycle_rank_total": batch_df["lifecycle_rank_total"],
+        "amplitude_quartile": batch_df["amplitude_quartile"],
+        "duration_quartile": batch_df["duration_quartile"],
+        "new_price_quartile": batch_df["new_price_quartile"],
+        "lifecycle_quartile": batch_df["lifecycle_quartile"],
+        "ranking_asof_date": batch_df["signal_date"],
+        "contract_version": EXECUTION_CONTEXT_CONTRACT_VERSION,
+        "created_at": batch_df["created_at"],
+    })
+    return exec_df
+
+
 def _flush_batch(malf_db_path: Path, rows: list[dict], run_id: str) -> None:
     """写入一批 MALF 快照（先删后插，幂等）。"""
     _batch_df = pd.DataFrame(rows)
     _batch_df["run_id"] = run_id
     _batch_df["created_at"] = datetime.utcnow()
+    _execution_context_df = _build_execution_context_df(_batch_df)
 
     sig_date = _batch_df["signal_date"].iloc[0]
     batch_codes = _batch_df["code"].unique().tolist()
 
     col_list = ", ".join(_SNAPSHOT_COLS)
+    exec_col_list = ", ".join(_EXECUTION_CONTEXT_COLS)
     with duckdb.connect(str(malf_db_path)) as conn:
         conn.execute(
             "DELETE FROM malf_context_snapshot "
@@ -522,8 +603,17 @@ def _flush_batch(malf_db_path: Path, rows: list[dict], run_id: str) -> None:
             [sig_date, batch_codes],
         )
         conn.execute(
+            "DELETE FROM execution_context_snapshot "
+            "WHERE calc_date = ? AND entity_scope = 'stock' AND entity_code = ANY(?)",
+            [sig_date, batch_codes],
+        )
+        conn.execute(
             f"INSERT INTO malf_context_snapshot ({col_list}) "
             f"SELECT {col_list} FROM _batch_df"
+        )
+        conn.execute(
+            f"INSERT INTO execution_context_snapshot ({exec_col_list}) "
+            f"SELECT {exec_col_list} FROM _execution_context_df"
         )
 
 

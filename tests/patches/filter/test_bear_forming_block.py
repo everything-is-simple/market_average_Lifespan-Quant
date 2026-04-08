@@ -54,6 +54,12 @@ class TestBearFormingBlock:
             result = _check_background_not_supporting(ctx)
         assert result is True
 
+    def test_bear_persisting_countertrend_is_blocked(self):
+        """BEAR_PERSISTING + COUNTERTREND 应被视为双重不利背景。"""
+        ctx = _make_malf("BEAR_PERSISTING", weekly="against_flow")
+        result = _check_background_not_supporting(ctx)
+        assert result is True
+
     def test_bull_persisting_never_blocked(self):
         """牛市背景不受任何背景开关影响，始终允许。"""
         ctx = _make_malf("BULL_PERSISTING")

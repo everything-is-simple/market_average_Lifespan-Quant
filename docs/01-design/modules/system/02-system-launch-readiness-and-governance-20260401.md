@@ -31,7 +31,7 @@
 | G5 position sizing 可用 | `compute_position_plan()` 产出合法 lot_count | 已完成 |
 | G6 trade 回测可运行 | `BacktestEngine` 在 30 日窗口无崩溃 | 待验证 |
 | G7 system closeout 通过 | `run_system_closeout()` 返回 `closeout_ready=True` | 待实现 |
-| G8 BPB 全链路未出现 | grep 全量代码无 BPB 调用路径 | 需治理脚本确认 |
+| G8 REJECTED trigger 不进入默认主线 | 默认 system 调用路径不出现 `BPB / CPB` | 需文档/代码复核；BPB 另由治理脚本确认 |
 
 **禁止混用**：L1 达成 ≠ 可以声称"零售散户照做也差不多"，必须在所有报告中显式标注"研究验证层结论"。
 
@@ -64,13 +64,13 @@
 |---|---|---|
 | mootdx 本地日线数据 | T1 | 有 design/spec/conclusion，直接支撑主线 |
 | 后复权因子（gbbq）计算 | T1 | 已正式实现并测试 |
-| MALF 月线状态 8 分类 | T1 | 已正式冻结，直接支撑 PAS 背景层 |
-| MALF 周线流向 | T1 | 已正式冻结 |
-| MALF 日线现象（触发位） | T1 | 已正式冻结 |
+| MALF 四格上下文（`MalfContext4`） | T1 | 已正式冻结，作为当前主线背景语义 |
+| MALF 正式执行摘要（`long_background_2 / intermediate_role_2 / malf_context_4`） | T1 | 已进入 PAS / system 正式合同 |
+| `monthly_state / weekly_flow` 兼容字段 | T2 | 仅诊断 / 兼容保留，不再作为正式主线读数 |
 | BOF 触发器 | T1 | 已正式验证（继承自父系统结论） |
 | PB 触发器 | T2 | 有边界可用，需独立 16 格验证才升 T1 |
 | TST 触发器 | T2 | 有边界可用，待独立验证 |
-| CPB 触发器 | T2 | 有边界可用，待独立验证 |
+| CPB 触发器 | T3 | 当前正式口径为 `REJECTED`，仅历史追溯保留 |
 | BPB 触发器 | T3 | 已研究验证，**永久禁止进入主线 system 层** |
 | structure 结构位语言 | T2 | 有边界可用，filter 已实现，但结构位精度待验 |
 | adverse conditions filter | T2 | 有边界可用，过滤逻辑已实现，参数待回测优化 |
@@ -90,14 +90,14 @@
 
 ```
 mootdx 本地数据（T1）
-  → MALF 三层背景（T1）
+  → MALF 四格上下文 / 正式摘要（T1）
     → BOF 触发器（T1）
-      → FIXED_NOTIONAL position sizing（T1）
-        → TradeManager 5阶段状态机（T1）
-          → run_daily_signal_scan（T1）
+      → run_daily_signal_scan（T1）
 ```
 
-这条链是 L1 上线的核心骨干，其余 T2/T3 能力作为边界条件或研究补充。
+`position sizing` 与 `TradeManager 5 阶段状态机` 虽然各自已有稳定合同，但当前尚未由 `system` runner 串成已实现的 backtest / closeout 主线，因此不应在此图中冒充为 `run_daily_signal_scan()` 的既成依赖。
+
+这条链是当前已核实的 system T1 核心骨干，其余 T2/T3 能力作为边界条件、待实现 runner 或研究补充。
 
 ---
 
@@ -109,9 +109,10 @@ mootdx 本地数据（T1）
 
 | 概念 | 来源书义 | 系统承接状态 | 系统实现证据 |
 |---|---|---|---|
-| 市场平均寿命（MALF） | YTC 卷 2 波浪结构 + 《交易圣经》生命周期 | **已实现** | `lq.malf` 三层矩阵，`MalfContext` 合同 |
+| 市场平均寿命（MALF） | YTC 卷 2 波浪结构 + 《交易圣经》生命周期 | **已实现** | `lq.malf` 正式四格上下文与执行摘要合同 |
 | PAS 触发形态（BOF） | YTC 卷 3 BOF 策略 | **已实现** | `lq.alpha.pas.detectors.BOFDetector` |
-| PAS 触发形态（PB/TST/CPB） | YTC 卷 3 | **部分承接** | 代码存在，独立 16 格验证未全部完成 |
+| PAS 触发形态（PB/TST） | YTC 卷 3 | **部分承接** | 代码存在，独立验证未全部完成 |
+| PAS 触发形态（CPB） | YTC 卷 3 | **历史追溯保留** | 当前正式口径为 `REJECTED`，不进入主线 system |
 | 1R 仓位规模（固定风险） | 《交易圣经》第 8 章 | **已实现** | `compute_position_plan()` + `FIXED_NOTIONAL_CONTROL` |
 | 止损移位（保本止损） | 《交易圣经》第 8 章 | **已实现** | `TradeManager.BREAKEVEN_TRIGGER_R=0.5` |
 | 跟踪止损（runner） | 《交易圣经》第 8 章 | **已实现** | `TradeManager.TRAILING_STEP_PCT=0.06` |
@@ -182,7 +183,7 @@ ALLOWED_DEPS = {
 
 | 项目 | 说明 | 对应信任档 |
 |---|---|---|
-| R1 PB/TST/CPB 独立 16 格验证 | 升 T1 需要，但不卡 L1 | T2 |
+| R1 PB/TST 独立验证 | 升 T1 需要，但不卡 L1 | T2 |
 | R2 structure 精度验证 | 结构位识别回测优化 | T2 |
 | R3 adverse conditions 参数优化 | 过滤参数回测调优 | T2 |
 | R4 raw-execution 价格对齐 | L2 必须项 | T3 |

@@ -52,3 +52,15 @@ alwaysApply: true
 - BPB / CPB 均为 REJECTED，system 层禁止调用
 - 模块间只传结果合同，禁止反向依赖
 - 路径/密钥禁止硬编码，统一经 `core/paths.py` 或环境变量
+
+---
+
+## 本次补充规则
+
+- `MALF` 当前正式执行主轴是 `MalfContext4` 四格上下文；`MonthlyState8` 与 `WeeklyFlowRelation` 仅作为计算层诊断、兼容与追溯字段保留，禁止再把 `monthly_state_8 × weekly_flow_relation` 写成执行主读数。
+- `MalfContext4.from_monthly_weekly()` 是旧入口到四格上下文的正式兼容桥接；修订设计、spec 或调用合同描述时，必须保留该映射关系与兼容角色说明。
+- `core.paths` 当前冻结为 5 个 workspace 根 + 7 个正式数据库路径合同；文档与代码中必须统一使用 `validated_root`，并保持 `raw_market / market_base / malf / structure / filter / research_lab / trade_runtime` 七库口径一致。
+- 当前默认同级目录名固定为 `Lifespan-Quant-data`、`Lifespan-temp`、`Lifespan-Quant-report`、`Lifespan-Quant-Validated`；禁止在文档或实现里回退到旧目录名口径。
+- `tdx_offline_data_root()` 是正式路径 helper；默认目录为 `H:\tdx_offline_Data`，只用于离线导出/灌库路径，不替代 `TDX_ROOT` 下 `.day / gbbq` 的主线数据来源。
+- 修订正式模块文档时，必须同步核对对应 `design / spec / 代码合同 / execution conclusion`；对已被 `016` 覆盖的旧 `16-cell / scene_id / scene quartile` 口径，只能作为历史追溯说明，不得再写成当前正式语义。
+- 需要稳定导入 `discover_repo_root / tdx_root / tdx_offline_data_root / tushare_token_path` 等路径 helper 时，优先使用 `from lq.core.paths import ...`；当前 `lq.core` 顶层不承诺全量 re-export。

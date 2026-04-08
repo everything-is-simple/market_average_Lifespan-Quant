@@ -8,13 +8,13 @@
 
 1. `PasDetectTrace / PasSignal / PasBatchResult` 合同字段约束
 2. `research_lab.duckdb` alpha 表域 schema（对应 `src/lq/alpha/pas/bootstrap.py`）
-3. `run_all_detectors` 批量执行合同
+3. `run_all_detectors` 单股单日探测合同与 `run_pas_batch / run_pas_build` 批量执行合同
 4. 写权边界
 
 本规格不覆盖：
 
 1. 各 trigger 的探测算法细节（见 `detectors.py`）
-2. 16 格准入裁决更新（见 `02-pas-cell-gate-and-16cell-admission-design-20260401.md`）
+2. 16 格准入裁决更新（见 `02-pas-cell-gate-admission-design-20260401.md`）
 
 ## 2. 合同字段约束
 
@@ -22,13 +22,15 @@
 
 | 字段 | 类型 | 约束 |
 |---|---|---|
-| `signal_id` | str | `{code}_{signal_date}_{pattern}` 格式 |
+| `signal_id` | str | `PAS_{version}_{code}_{signal_date}_{pattern}` 格式（由 `build_signal_id()` 生成） |
 | `pattern` | str | BOF / PB / BPB / TST / CPB |
 | `triggered` | bool | 必须明确 |
 | `strength` | float or None | triggered=True 时必须有值，[0.0, 1.0] |
 | `skip_reason` | str or None | triggered=False 时说明原因 |
+| `detect_reason` | str or None | 触发或未触发的可复述原因 |
 | `history_days` | int | 实际可用历史天数 |
 | `min_history_days` | int | 最小所需历史天数 |
+| `pb_sequence_number` | int or None | PB 序号；非 PB 可为空 |
 
 ### 2.2 PasSignal
 
@@ -38,20 +40,28 @@
 | `code` | str | 6 位纯代码（L2+层） |
 | `signal_date` | date | 信号日（T日） |
 | `pattern` | str | BOF / PB / TST / CPB（BPB 不写正式信号表） |
-| `surface_label` | str | 四值枚举 |
+| `long_background_2` | str or None | 正式长期背景 |
+| `intermediate_role_2` | str or None | 正式中期角色 |
+| `malf_context_4` | str | 四值枚举 |
+| `amplitude_rank_* / duration_rank_* / new_price_rank_*` | int or None | 三轴原始排位 |
+| `lifecycle_rank_*` | int or None | 生命周期总区间 |
+| `*_quartile` | str or None | 四分位辅助 |
 | `strength` | float | [0.0, 1.0] |
 | `signal_low` | float | 后复权价，止损参考 |
 | `entry_ref_price` | float | 后复权价，T+1 开盘参考 |
 | `pb_sequence_number` | int or None | 仅 PB 触发时有值 |
+| `monthly_state / weekly_flow` | str or None | 兼容字段，仅供 gate/追溯 |
 
 ### 2.3 PasBatchResult
 
 | 字段 | 约束 |
 |---|---|
-| `run_id` | UUID，每次 batch 唯一 |
-| `traces` | list[PasDetectTrace] |
-| `signals` | list[PasSignal]，只含 triggered=True 且准入格的信号 |
-| `total_candidates` | 本次扫描候选股数 |
+| `run_id` | 每次 batch 唯一 |
+| `asof_date` | 当前信号日 |
+| `codes_scanned` | 本次扫描股票数 |
+| `triggered_count` | 正式触发信号数 |
+| `pattern_counts` | 各 trigger 的正式触发数 |
+| `signals` | `tuple[PasSignal, ...]`，只含 triggered=True 且准入格的信号 |
 
 ## 3. research_lab.duckdb 表域（冻结）
 
@@ -72,7 +82,8 @@
 
 - alpha/pas 写 `research_lab.duckdb` 中以上六张表
 - alpha/pas 读 `market_base.duckdb`
-- alpha/pas 读冻结后的 malf 输出（MalfContext 对象）
+- alpha/pas 读 `malf.execution_context_snapshot`（正式生命周期字段）
+- alpha/pas 如需 gate 兼容字段，可补读 `malf_context_snapshot.monthly_state / weekly_flow`
 
 ### 禁止
 
@@ -91,19 +102,42 @@ traces = run_all_detectors(code, signal_date, df)
 
 返回 5 个 `PasDetectTrace`（每个 trigger 各一个）。
 
-### 5.2 批量扫描（待建）
+### 5.2 单日批量扫描（已实现）
 
 ```python
 result = run_pas_batch(
-    codes: list[str],
-    window_start: date,
-    window_end: date,
-    malf_context_provider: Callable,
-    market_base_conn: duckdb.Connection,
+    signal_date: date,
+    codes: Sequence[str],
+    market_base_path: Path,
+    malf_db_path: Path,
+    research_lab_path: Path,
+    patterns: list[str] | None = None,
+    lookback_days: int = 240,
+    verbose: bool = False,
 ) -> PasBatchResult
 ```
 
-批量结果写入 `research_lab.duckdb`，同时写 `pas_registry_run`。
+批量结果写入 `research_lab.duckdb`，同时写 `pas_registry_run`、`pas_selected_trace` 与 `pas_formal_signal`。
+
+### 5.3 多日期批量构建（已实现）
+
+```python
+result = run_pas_build(
+    market_base_path: Path,
+    malf_db_path: Path,
+    research_lab_path: Path,
+    signal_dates: Sequence[date],
+    codes: Sequence[str] | None = None,
+    patterns: list[str] | None = None,
+    lookback_days: int = 240,
+    resume: bool = False,
+    reset_checkpoint: bool = False,
+    settings: WorkspaceRoots | None = None,
+    verbose: bool = True,
+)
+```
+
+按日期调用 `run_pas_batch()`，并通过 checkpoint 支持断点续传。
 
 ## 6. 代码落点
 
@@ -113,5 +147,5 @@ result = run_pas_batch(
 | `src/lq/alpha/pas/detectors.py` | ✅ 已有（5 trigger） | 探测器实现 |
 | `src/lq/alpha/pas/validation.py` | ✅ 已有（cell_gate_check） | 16 格准入 + cell_gate |
 | `src/lq/alpha/pas/bootstrap.py` | ✅ 已建 | research_lab schema |
-| batch pipeline runner | ❌ 待建 | 批量扫描 + 落表 |
-| `scripts/alpha/run_pas_batch.py` | ❌ 待建 | 脚本入口 |
+| `src/lq/alpha/pas/pipeline.py` | ✅ 已建 | `run_pas_batch()` + `run_pas_build()` |
+| `scripts/alpha/run_pas_batch.py` | ✅ 已建 | 脚本入口 |

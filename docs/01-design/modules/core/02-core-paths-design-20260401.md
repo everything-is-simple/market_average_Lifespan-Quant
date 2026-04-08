@@ -8,7 +8,7 @@
 2. 五目录协作规范与默认命名约定
 3. 七数据库路径规范（全持久化）
 4. 环境变量覆盖机制（完整清单）
-5. 特殊数据源路径（TDX / Tushare）
+5. 特殊数据源路径（TDX / TDX offline / Tushare）
 6. 与父/爷爷系统的对比与取舍
 
 ---
@@ -38,7 +38,7 @@ class WorkspaceRoots:
 class DatabasePaths:
     raw_market:    Path   # L1 原始日线 + gbbq（由 data 模块独占写）
     market_base:   Path   # L2 复权价、均线、量比（由 data 模块独占写）
-    malf:          Path   # L3 MALF 三层主轴输出（由 malf 模块独占写）
+    malf:          Path   # L3 MALF 计算层输出与 execution_context 快照（由 malf 模块独占写）
     structure:     Path   # L3 结构位快照（由 structure 模块独占写）
     filter:        Path   # L3 不利条件结果（由 filter 模块独占写）
     research_lab:  Path   # L3 PAS 信号 + 仓位计划（由 alpha+position 独占写）
@@ -70,10 +70,10 @@ def databases(self) -> DatabasePaths:
 | 目录根 | 环境变量 | 默认名称 | 存放内容 | 禁止存放 |
 |---|---|---|---|---|
 | `repo_root` | LQ_REPO_ROOT | `Lifespan-Quant` | 代码、文档、测试、脚本 | 数据库、日志、缓存 |
-| `data_root` | LQ_DATA_ROOT | `Lifespan-data` | 正式数据库、正式数据产物 | 代码、临时文件 |
+| `data_root` | LQ_DATA_ROOT | `Lifespan-Quant-data` | 正式数据库、正式数据产物 | 代码、临时文件 |
 | `temp_root` | LQ_TEMP_ROOT | `Lifespan-temp` | 临时产物、pytest、benchmark | 正式代码/数据库 |
-| `report_root` | LQ_REPORT_ROOT | `Lifespan-report` | 人读报告、图表、导出物 | 代码 |
-| `validated_root` | LQ_VALIDATED_ROOT | `Lifespan-Validated` | 长期验证资产快照 | 普通临时产物 |
+| `report_root` | LQ_REPORT_ROOT | `Lifespan-Quant-report` | 人读报告、图表、导出物 | 代码 |
+| `validated_root` | LQ_VALIDATED_ROOT | `Lifespan-Quant-Validated` | 长期验证资产快照 | 普通临时产物 |
 
 ### 3.2 默认目录位置规则
 
@@ -82,10 +82,10 @@ def databases(self) -> DatabasePaths:
 ```
 parent/
   Lifespan-Quant/    ← repo_root（代码仓库）
-  Lifespan-data/     ← data_root（正式数据）
+  Lifespan-Quant-data/     ← data_root（正式数据）
   Lifespan-temp/     ← temp_root（临时产物）
-  Lifespan-report/   ← report_root（报告）
-  Lifespan-Validated/← validated_root（验证快照）
+  Lifespan-Quant-report/   ← report_root（报告）
+  Lifespan-Quant-Validated/← validated_root（验证快照）
 ```
 
 在 Windows 实际环境（本机）：
@@ -100,17 +100,19 @@ H:\Lifespan-Quant-Validated\ ← validated_root
 
 ---
 
-## 4. 五数据库路径规范
+## 4. 七数据库路径规范
 
 ### 4.1 分层归属与写权规则
 
-| 数据库 | 层级 | Owner 模块 | 允许读取的模块 |
+| 数据库 | 层级 | Owner 模块 | 当前用途 |
 |---|---|---|---|
-| raw_market.duckdb | L1 | data | data |
-| market_base.duckdb | L2 | data | data, malf, alpha, position, trade, system |
-| research_lab.duckdb | L3 | alpha | alpha, position, trade（bridge 白名单内） |
-| malf.duckdb | L3 | malf | malf, alpha, system |
-| trade_runtime.duckdb | L4 | trade + system | trade, system, report（只读） |
+| raw_market.duckdb | L1 | data | 原始日线（TDX txt / .day）+ `raw_xdxr_event` |
+| market_base.duckdb | L2 | data | 后复权日/周/月线、均线、量比 |
+| malf.duckdb | L3 | malf | MALF 计算层输出与 execution_context 快照 |
+| structure.duckdb | L3 | structure | 结构位快照（支撑/阻力/突破） |
+| filter.duckdb | L3 | filter | 不利条件检查结果 |
+| research_lab.duckdb | L3 | alpha + position | PAS 信号与仓位计划 |
+| trade_runtime.duckdb | L4 | trade + system | 交易记录与权益曲线 |
 
 **写权独占原则**：每个数据库只有 owner 模块可写，其他模块只能通过 owner 提供的 Python 接口读取，禁止跨模块直接写入。
 
@@ -139,7 +141,8 @@ H:\Lifespan-Quant-data\trade\trade_runtime.duckdb
 | LQ_TEMP_ROOT | WorkspaceRoots.temp_root | `H:\Lifespan-temp` |
 | LQ_REPORT_ROOT | WorkspaceRoots.report_root | `H:\Lifespan-Quant-report` |
 | LQ_VALIDATED_ROOT | WorkspaceRoots.validated_root | `H:\Lifespan-Quant-Validated` |
-| TDX_ROOT | 通达信本地目录 | `D:\new-tdx\new-tdx` |
+| TDX_ROOT | 通达信本地目录 | `H:\new_tdx64` |
+| TDX_OFFLINE_DATA_ROOT | 通达信离线导出目录 | `H:\tdx_offline_Data` |
 | TUSHARE_TOKEN_PATH | tushare token 配置文件路径 | `H:\keys\tushare_token.txt` |
 
 ### 5.2 解析优先级
@@ -174,16 +177,29 @@ ws = default_settings()
 
 ```python
 def tdx_root() -> Path:
-    """解析通达信本地目录。优先 TDX_ROOT 环境变量，否则用 G:\new-tdx\new-tdx。"""
-    return Path(os.getenv("TDX_ROOT", r"G:\new-tdx\new-tdx")).resolve()
+    """解析通达信本地目录。优先 TDX_ROOT 环境变量，否则用 H:\new_tdx64。"""
+    return Path(os.getenv("TDX_ROOT", r"H:\new_tdx64")).resolve()
 ```
 
 **设计约束**：
 - 返回 `Path` 对象（不自动验证存在性），调用方负责检查
-- 默认值 `G:\new-tdx\new-tdx` 是本机通达信安装路径，生产机器必须通过 `TDX_ROOT` 覆盖
+- 默认值 `H:\new_tdx64` 是当前本机通达信安装路径，其他机器可通过 `TDX_ROOT` 覆盖
 - `data` 模块通过 `mootdx` 库读取此目录下的 `.day` 文件
 
-### 6.2 tushare_token_path() — Token 配置文件路径
+### 6.2 tdx_offline_data_root() — 通达信离线导出目录
+
+```python
+def tdx_offline_data_root() -> Path:
+    """解析通达信离线导出数据目录。优先 TDX_OFFLINE_DATA_ROOT 环境变量。"""
+    return Path(os.getenv("TDX_OFFLINE_DATA_ROOT", r"H:\tdx_offline_Data")).resolve()
+```
+
+**设计约束**：
+- 返回 `Path` 对象（不自动验证存在性），调用方负责检查
+- 默认值 `H:\tdx_offline_Data` 对应当前离线导出目录约定
+- 该目录用于 `txt` 全量灌库等离线路径，不替代 `TDX_ROOT` 下的 `.day / gbbq` 主线来源
+
+### 6.3 tushare_token_path() — Token 配置文件路径
 
 ```python
 def tushare_token_path() -> Path | None:
@@ -221,7 +237,7 @@ def discover_repo_root(start: Path | None = None) -> Path:
 |---|---|---|---|
 | 配置机制 | pydantic_settings（重） | 纯 env var（轻） | 纯 env var（继承父系统） |
 | workspace 根数 | 3（data/temp/log） | 4（repo/data/temp/report） | **5**（+validated） |
-| 数据库数量 | 1（单库分层） | 5（独立文件） | 5（独立文件，继承父系统） |
+| 数据库数量 | 1（单库分层） | 5（独立文件） | **7**（独立文件，扩展为七库全持久化） |
 | TDX 路径 | 无（tushare 主线） | 无（tushare 主线） | **有**（mootdx 主线） |
 | Tushare | Settings.tushare_token（直接存储） | 不在 core 层 | **只存路径**（安全升级） |
 | validated 目录 | 无 | 无 | **有**（新增） |

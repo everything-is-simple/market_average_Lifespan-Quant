@@ -1,6 +1,6 @@
 # data L2 后复权计算管道规格 / 2026-04-01
 
-> 本规格落地设计文档 `docs/01-design/modules/data/01-data-l2-backward-adjustment-compute-design-20260401.md`，定义可执行的合同约束。
+> 本规格落地设计文档 `docs/01-design/modules/data/00-data-charter-20260404.md` 与 `docs/01-design/modules/data/01-data-l2-backward-adjustment-compute-design-20260401.md`，定义两步走架构下 Step 2（`.day + gbbq` 日增量路径）的可执行合同约束。
 
 ## 1. 范围
 
@@ -16,6 +16,7 @@
 
 1. baostock 审计链（另开独立卡）
 2. full market rebuild（需先通过 smoke 验证）
+3. `TDX_OFFLINE_DATA_ROOT` txt 全量灌入（由 `02-data-l1-tdx-txt-bulk-import-design-20260404.md` 覆盖）
 
 ## 2. 输入合同
 
@@ -67,10 +68,12 @@
 
 ### 4.1 build_l2_adjusted.py 脚本参数
 
-```
+```text
 --window-start  DATE  # L2 构建起始日（含）
 --window-end    DATE  # L2 构建终止日（含）
---force-rebuild       # 可选：忽略幂等检查，强制全量重算
+--codes         CODE [CODE ...]  # 可选：仅处理指定股票代码
+--batch-size    INT              # 可选：每批处理股票数，默认 200
+--dry-run                        # 可选：仅打印参数，不执行写入
 ```
 
 ### 4.2 幂等性保证
@@ -83,7 +86,7 @@
 
 对每个 gbbq category=1 事件：
 
-```
+```text
 factor_i = (prev_close - fenhong/10 + peigujia × peigu/10)
            / ((1 + (songzhuangu + peigu)/10) × prev_close)
 ```
@@ -115,9 +118,13 @@ xdxr 缺失时 factor=1.0，不影响非除权股票。
 
 本规格已冻结。代码实现已完成（2026-04-01）。
 
-后续执行卡：
-1. ~~实现 `compute/adjust.py`~~ ✅
-2. ~~实现 `compute/aggregate.py`~~ ✅
-3. ~~实现 `scripts/data/build_l2_adjusted.py`~~ ✅
-4. 按验证阈值抽样验证（待 L1 数据灌入后执行）
-5. 补 `tests/unit/data/test_adjust_factor.py`（待开卡）
+当前 execution 锚点：
+
+1. `014` — 按验证阈值抽样验证，当前仍为 `pending-validation`
+2. `015` — `adjust_factor` 关键路径单测补全，已于 `2026-04-08` 形成关闭结论
+
+当前说明：
+
+1. `014` 负责抽样核对 `raw_xdxr_event`、`raw_stock_daily`、`stock_daily_adjusted.adjustment_factor` 与价格链一致性。
+2. `015` 已为 `src/lq/data/compute/adjust.py` 中的 `compute_backward_factors()` / `apply_backward_adjustment()` 补齐最小关键路径单测保护。
+3. 当前仓库中已存在 `tests/unit/data/test_adjust_factor.py`，因此 `015` 不再处于“准备补测”状态，而是已闭环完成。

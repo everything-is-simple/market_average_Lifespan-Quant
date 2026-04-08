@@ -66,6 +66,23 @@
 | `historical_sample_count` | 同标的同格历史已完成波段数量 |
 | `ranking_asof_date` | 本次生命周期读数的观察日期 |
 
+按 `020` bootstrap 结论，当前第一版 `execution_context_snapshot` 允许：
+
+1. `active_wave_id` 暂时为空
+2. `historical_sample_count` 暂时为空
+3. `ranking_asof_date` 先等于本次 `calc_date`
+
+### 2.6 兼容残留字段（非正式）
+
+下列字段或命名允许因历史 run、旧报表、旧接口而继续存在，但**不属于**当前正式执行合同最小集：
+
+| 残留字段 / 命名 | 当前地位 | 说明 |
+|-----------------|----------|------|
+| `monthly_state` / `monthly_state_8` | 诊断 / 兼容 | 月线八态可保留，但执行层正式主字段是 `long_background_2` |
+| `weekly_flow` / `weekly_flow_relation_to_monthly` | 诊断 / 兼容 | 正式主字段是 `intermediate_role_2` |
+| `is_new_high_today` / `new_high_seq` / `days_since_last_new_high` / `new_high_count_in_window` | 历史命名 / 待迁移 | 若继续存在，只能视为 `new_price_*` 的旧命名，不得替代正式字段 |
+| `scene_quartile` / 裸 `quartile` / `16-cell` | 历史报表 / 兼容观察字段 | 不代表生命周期三轴原始排位或总生命区间 |
+
 ## 3. execution_context_snapshot 桥表
 
 `malf.execution_context_snapshot` 最小列要求：
@@ -87,6 +104,14 @@
 15. `ranking_asof_date`
 16. `contract_version`
 
+上述列是正式最小列。兼容残留列若暂时保留，必须显式标注其非正式身份，且不得替代任一正式列。
+
+当前 bootstrap 边界：
+
+1. 第一版 bridge table 允许 `active_wave_id`、`historical_sample_count` 为 `NULL`
+2. 当前最小落表合同**不包含** `ranking_status` / `ranking_status_reason`
+3. 若后续需要把 ranking 状态正式落表，必须另开卡并同步升级 design / spec / schema
+
 ## 4. 历史样本池合同
 
 样本池规则：
@@ -96,12 +121,14 @@
 3. 当前 active wave 不得进入自己的基准样本池
 4. 历史样本不足时，必须显式落边界状态，不允许静默伪造四分位
 
-排位状态输出：
+目标态扩展状态（当前 bootstrap 未落表）：
 
 | 字段 | 含义 |
 |------|------|
 | `ranking_status` | `READY / INSUFFICIENT_HISTORY / ACTIVE_WAVE_NOT_SCORABLE` |
 | `ranking_status_reason` | 可复述原因 |
+
+上述状态字段当前只作为后续 ranking 算法落地后的扩展方向说明，不属于 `020` 第一版 bridge table 的正式最小列。
 
 ## 5. 计算合同
 
@@ -140,7 +167,7 @@
 
 `execution_context_snapshot build` 阶段：
 
-输入：月线背景 + 周线中级 + 日线新价结构 + 历史波段样本池。
+输入：月线背景 + 周线中级角色 + 当前 active wave 边界（起点价 / 起点日期） + 日线新价结构输入 + 历史波段样本池。
 
 输出：`execution_context_snapshot` 桥表。
 
@@ -153,6 +180,8 @@
 3. `lifecycle_rank_low` / `lifecycle_rank_high` / `lifecycle_rank_total`
 4. `amplitude_quartile` / `duration_quartile` / `new_price_quartile` / `lifecycle_quartile`
 
+`PAS` 不得把 `monthly_state_8`、`weekly_flow_relation_to_monthly`、`scene_quartile` 等兼容字段重新抬升为正式准入主轴。
+
 ## 8. Position 接口合同
 
 `position` 正式最小输入：
@@ -160,5 +189,7 @@
 1. `malf_context_4`
 2. 三轴原始排位区间 + `lifecycle_rank_*`
 3. 三轴四分位 + `lifecycle_quartile`
+
+`position` 若暂时继续透传旧字段，只能作为兼容观察信息，不得覆盖生命周期正式读数。
 
 本规格不冻结具体仓位公式，只冻结输入合同。先把生命周期读数做对，下游 sizing 可以变，上游定义不能漂。

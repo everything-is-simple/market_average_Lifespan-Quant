@@ -66,6 +66,7 @@ MIN_LONG_TREND_VALIDATION_PASS_COUNT = 2
 
 # PAS 信号合同版本
 PAS_CONTRACT_VERSION = "v1"
+EXECUTION_CONTEXT_CONTRACT_VERSION = "v1"
 
 
 # ---------------------------------------------------------------------------
